@@ -1,8 +1,9 @@
 # DGX Spark vLLM backend
 
 This directory is the vLLM backend managed exclusively by
-`/home/chihung/ai/dgx-model`. It serves an OpenAI-compatible API on port `8080`
-and mounts checkpoints read-only from `/home/chihung/models/huggingface`.
+the repository-root `dgx-model` command. It serves an OpenAI-compatible API on
+port `8080` and mounts checkpoints read-only from the host Hugging Face model
+directory configured by Compose.
 
 The container image is pinned by digest in `compose.yaml`. Profiles under
 `profiles/*.args` are the only source of model-specific vLLM arguments.
@@ -23,8 +24,6 @@ concurrent sequences.
 ## Commands
 
 ```bash
-cd /home/chihung/ai
-
 ./dgx-model list vllm
 ./dgx-model show vllm qwen-dflash
 ./dgx-model image pull vllm

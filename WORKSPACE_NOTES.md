@@ -2,16 +2,16 @@
 
 Last inspected: 2026-08-04 (Asia/Taipei)
 
-This file is a concise operating map of `/home/chihung/ai`. Runtime status is
-only a dated snapshot; profile files and Compose configuration remain the source
-of truth.
+This file is a concise operating map of the repository. Runtime status is only
+a dated snapshot; profile files and Compose configuration remain the source of
+truth.
 
 ## Top-level layout
 
 | Path | Purpose | Persistent/runtime data |
 | --- | --- | --- |
-| `llama.cpp/` | GGUF LLM runtime and profile manager | Host models under `/home/chihung/models/gguf` |
-| `vllm/` | vLLM OpenAI-compatible server and profile manager | Host models under `/home/chihung/models/huggingface` |
+| `llama.cpp/` | GGUF LLM runtime and profile manager | External host GGUF model directory |
+| `vllm/` | vLLM OpenAI-compatible server and profile manager | External host Hugging Face model directory |
 
 The workspace root is tracked in the `chihungchang/DGX-Model` Git repository
 and contains no `AGENTS.md`.

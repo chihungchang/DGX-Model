@@ -1,12 +1,12 @@
 # DGX Spark llama.cpp backend
 
 This directory is the llama.cpp backend managed exclusively by
-`/home/chihung/ai/dgx-model`. It serves an OpenAI-compatible API, web UI, health
-endpoint, and Prometheus metrics on port `8080`.
+the repository-root `dgx-model` command. It serves an OpenAI-compatible API,
+web UI, health endpoint, and Prometheus metrics on port `8080`.
 
 The local CUDA image is `mazi/llama.cpp:b10236-cuda13-openssl`, built from
 llama.cpp commit `1464c62d88f699ec9700c8010bbfdbc603a9efd6`. GGUF files are
-mounted read-only from `/home/chihung/models/gguf`.
+mounted read-only from the host GGUF model directory configured by Compose.
 
 ## Installed profiles
 
@@ -21,8 +21,6 @@ mounted read-only from `/home/chihung/models/gguf`.
 ## Commands
 
 ```bash
-cd /home/chihung/ai
-
 ./dgx-model list llamacpp
 ./dgx-model show llamacpp qwen36-fable-q4-mtp
 ./dgx-model image build llamacpp

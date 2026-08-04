@@ -1,10 +1,9 @@
 # DGX model management
 
 `dgx-model` is the only management command for the main vLLM and llama.cpp
-engines on this DGX Spark. Run it from `/home/chihung/ai`:
+engines on this DGX Spark. Run it from the repository root:
 
 ```bash
-cd /home/chihung/ai
 ./dgx-model --help
 ```
 
@@ -80,10 +79,11 @@ period for in-flight requests.
 
 ## Model downloads
 
-For vLLM, model paths such as `/models/nvidia/Qwen3.6-27B-NVFP4` map to
-`/home/chihung/models/huggingface/nvidia/Qwen3.6-27B-NVFP4`. `model pull` uses
-the host `hf` CLI and downloads the complete repository snapshot, including any
-drafter referenced by `--speculative-config`. Optional pinned revisions use:
+For vLLM, model paths such as `/models/nvidia/Qwen3.6-27B-NVFP4` map beneath
+the host Hugging Face model directory configured by the manager. `model pull`
+uses the host `hf` CLI and downloads the complete repository snapshot,
+including any drafter referenced by `--speculative-config`. Optional pinned
+revisions use:
 
 ```text
 # hf-revision: /models/organization/repository COMMIT_SHA
