@@ -12,6 +12,91 @@ memory. `use` validates the target profile, image, and every model artifact
 before it gracefully stops the other engine and starts the selected one. Both
 engines use the same fixed host/API port, `8080`.
 
+## Prerequisites
+
+This project targets NVIDIA DGX Spark. The host must provide:
+
+- Docker Engine with the Compose plugin
+- NVIDIA Container Toolkit and working Docker GPU access
+- Bash, Git, `curl`, `jq`, Python 3, `rich`, `flock`, and SHA-256 tools
+- Hugging Face `hf` CLI for model search, metadata, and downloads
+
+DGX Spark ships with the NVIDIA container runtime configured. The current
+[NVIDIA DGX Spark guide](https://docs.nvidia.com/dgx/dgx-spark/nvidia-container-runtime-for-docker.html)
+also explains GPU validation and optional non-root Docker access. `dgx-model`
+invokes Docker directly, so the current user must be able to run `docker`
+without `sudo`.
+
+## Installation
+
+Install the host utilities on Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y git curl jq python3 python3-rich util-linux
+```
+
+Install the `hf` CLI using the
+[official standalone installer](https://huggingface.co/docs/huggingface_hub/guides/cli):
+
+```bash
+curl -LsSf https://hf.co/cli/install.sh | bash
+```
+
+Clone this repository and create the host model directories:
+
+```bash
+git clone https://github.com/chihungchang/DGX-Model.git
+cd DGX-Model
+mkdir -p "$HOME/models/huggingface" "$HOME/models/gguf"
+```
+
+Verify the installation:
+
+```bash
+docker info >/dev/null
+docker compose version
+hf --version
+./dgx-model --help
+```
+
+Public models require no Hugging Face login. For private or gated repositories,
+authenticate once on the host; credentials are not passed into serving
+containers:
+
+```bash
+hf auth login
+```
+
+## Quick start
+
+The following example prepares and starts the included `qwen` vLLM profile.
+Model downloads can be large, so confirm available disk space first.
+
+```bash
+# Inspect readiness and runtime state.
+./dgx-model list
+./dgx-model show vllm qwen
+
+# Prepare the image and model artifacts.
+./dgx-model image pull vllm
+./dgx-model model pull vllm qwen
+
+# Validate without starting, then activate the profile.
+./dgx-model validate vllm qwen
+./dgx-model use vllm qwen
+
+# Confirm health and make a test completion.
+./dgx-model status vllm
+./dgx-model smoke vllm
+
+# Stop the service gracefully.
+./dgx-model stop vllm
+```
+
+While an engine is healthy, its OpenAI-compatible API is available at
+`http://127.0.0.1:8080/v1`.
+
 ## Repository overview
 
 | Backend | Host model storage | Canonical configuration |
@@ -44,7 +129,7 @@ health.
 | `qwen36-fable-q4-mtp` | Fable Fusion with embedded MTP and multimodal projector |
 | `qwythos` | Qwythos 9B with embedded MTP |
 
-## Common workflow
+## Usage
 
 ```bash
 # Discover and inspect profiles without changing runtime state.
