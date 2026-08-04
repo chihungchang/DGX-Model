@@ -30,5 +30,6 @@ __pycache__/
 *-backup
 *.codex-baseline-*
 
-# ComfyUI runtime data, downloaded models, custom nodes, inputs, and outputs
-/comfyui/data/
+# Local services outside the scope of this repository
+/audio/
+/comfyui/
