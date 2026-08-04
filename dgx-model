@@ -1,0 +1,1404 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+lock_file="${XDG_RUNTIME_DIR:-/tmp}/dgx-model-${UID}.lock"
+hf_profile_helper="$script_dir/scripts/dgx_model_hf.py"
+markdown_renderer="$script_dir/scripts/dgx_model_markdown.py"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./dgx-model list [vllm|llamacpp]
+      List profiles, complete model availability, and runtime state.
+
+  ./dgx-model show <engine> <profile>
+      Explain one profile, its arguments, image, and every model artifact.
+
+  ./dgx-model validate <engine> <profile>
+      Validate Compose, the image, profile syntax, and all model artifacts.
+
+  ./dgx-model model pull <engine> <profile> [--force]
+      Download and verify all model artifacts required by a profile.
+
+  ./dgx-model search [query] [--sort FIELD] [--limit N] [--json]
+      Search Hugging Face models and report every supported local engine.
+
+  ./dgx-model info <model-id> [--metadata|--text] [--json] [--raw]
+      Preview a model card, or print its metadata, text body, JSON, or raw Markdown.
+
+  ./dgx-model install <engine> <model-id> [--profile NAME] [--gguf FILE] [--force]
+      Read the model card, create a pinned default profile, and download it.
+
+  ./dgx-model image pull vllm
+      Pull the pinned vLLM container image.
+
+  ./dgx-model image build llamacpp
+      Build the pinned local llama.cpp CUDA image.
+
+  ./dgx-model use <engine> <profile> [--recreate]
+      Activate a validated profile. The other main engine is stopped first.
+
+  ./dgx-model status [vllm|llamacpp]
+      Show the actual Docker state and active profile recovered from Docker.
+
+  ./dgx-model logs <engine> [--follow]
+      Print the latest 200 log lines; --follow continues streaming.
+
+  ./dgx-model smoke <engine>
+      Send a small OpenAI-compatible chat request to the active engine.
+
+  ./dgx-model stop [vllm|llamacpp] [--force]
+      Gracefully stop one or both engines; --force uses a zero-second timeout.
+
+  ./dgx-model profile remove <engine> <profile> [--delete-files]
+      Remove a profile. Model data is retained unless --delete-files is given.
+
+  ./dgx-model compose-config <engine> <profile>
+      Print the fully rendered Docker Compose configuration.
+
+Engines:
+  vllm       Hugging Face checkpoints served on port 8080.
+  llamacpp   GGUF models served by llama.cpp on port 8080.
+EOF
+}
+
+die() {
+  local status="$1"
+  shift
+  printf '%s\n' "$*" >&2
+  exit "$status"
+}
+
+require_command() {
+  local command_name="$1"
+  command -v "$command_name" >/dev/null 2>&1 ||
+    die 69 "Required command is not installed: $command_name"
+}
+
+require_engine() {
+  case "${1:-}" in
+    vllm|llamacpp) ;;
+    *) die 64 "Unknown engine: ${1:-<empty>}. Expected vllm or llamacpp." ;;
+  esac
+}
+
+engine_dir() {
+  case "$1" in
+    vllm) printf '%s/vllm\n' "$script_dir" ;;
+    llamacpp) printf '%s/llama.cpp\n' "$script_dir" ;;
+  esac
+}
+
+engine_container() {
+  case "$1" in
+    vllm) printf 'dgx-vllm\n' ;;
+    llamacpp) printf 'dgx-llamacpp\n' ;;
+  esac
+}
+
+engine_port() {
+  case "$1" in
+    vllm) printf '8080\n' ;;
+    llamacpp) printf '8080\n' ;;
+  esac
+}
+
+engine_profile_env() {
+  case "$1" in
+    vllm) printf 'VLLM_PROFILE\n' ;;
+    llamacpp) printf 'LLAMA_PROFILE\n' ;;
+  esac
+}
+
+engine_model_root() {
+  case "$1" in
+    vllm) printf '/home/chihung/models/huggingface\n' ;;
+    llamacpp) printf '/home/chihung/models/gguf\n' ;;
+  esac
+}
+
+other_engine() {
+  case "$1" in
+    vllm) printf 'llamacpp\n' ;;
+    llamacpp) printf 'vllm\n' ;;
+  esac
+}
+
+profile_file_for() {
+  local engine="$1"
+  local profile="$2"
+  local directory profile_file
+
+  require_engine "$engine"
+  directory="$(engine_dir "$engine")"
+  profile_file="$directory/profiles/${profile}.args"
+  if [[ ! "$profile" =~ ^[a-z0-9][a-z0-9_-]*$ || ! -r "$profile_file" ]]; then
+    printf 'Unknown %s profile: %s\n' "$engine" "$profile" >&2
+    return 64
+  fi
+  printf '%s\n' "$profile_file"
+}
+
+default_profile() {
+  local engine="$1"
+  local directory profile_file profile
+
+  directory="$(engine_dir "$engine")"
+  profile_file="$(find "$directory/profiles" -maxdepth 1 -type f -name '*.args' -print | sort | head -n 1)"
+  [[ -n "$profile_file" ]] || die 66 "No profiles are installed for $engine."
+  profile="${profile_file##*/}"
+  printf '%s\n' "${profile%.args}"
+}
+
+read_profile_args() {
+  local profile_file="$1"
+  local arg
+
+  while IFS= read -r arg || [[ -n "$arg" ]]; do
+    arg="${arg%$'\r'}"
+    [[ -z "$arg" || "$arg" == \#* ]] && continue
+    printf '%s\n' "$arg"
+  done < "$profile_file"
+}
+
+arg_value() {
+  local flag="$1"
+  local profile_file="$2"
+  local arg
+  local -a args=()
+  local i
+
+  while IFS= read -r arg; do
+    args+=("$arg")
+  done < <(read_profile_args "$profile_file")
+
+  for ((i = 0; i < ${#args[@]}; i++)); do
+    if [[ "${args[i]}" == "$flag" ]]; then
+      printf '%s\n' "${args[i + 1]:-}"
+      return 0
+    fi
+    if [[ "${args[i]}" == "$flag="* ]]; then
+      printf '%s\n' "${args[i]#*=}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+first_profile_arg() {
+  local profile_file="$1"
+  awk 'NF && substr($0, 1, 1) != "#" { sub(/\r$/, ""); print; exit }' "$profile_file"
+}
+
+metadata_value() {
+  local key="$1"
+  local profile_file="$2"
+  awk -v prefix="# ${key}: " \
+    'index($0, prefix) == 1 { print substr($0, length(prefix) + 1); exit }' \
+    "$profile_file"
+}
+
+hf_revision_for() {
+  local container_path="$1"
+  local profile_file="$2"
+  awk -v wanted="$container_path" \
+    '$1 == "#" && $2 == "hf-revision:" && $3 == wanted { print $4; exit }' \
+    "$profile_file"
+}
+
+extra_profile_artifacts() {
+  local profile_file="$1"
+  awk '$1 == "#" && $2 == "artifact:" && NF == 6 {
+         print $3 "\t" $4 "\t" $5 "\t" $6
+       }' "$profile_file"
+}
+
+emit_artifact() {
+  local kind="$1"
+  local container_path="$2"
+  local source="${3:-}"
+  local checksum="${4:-}"
+  [[ -n "$container_path" ]] || return 0
+  printf '%s\t%s\t%s\t%s\n' "$kind" "$container_path" "$source" "$checksum"
+}
+
+profile_artifacts() {
+  local engine="$1"
+  local profile_file="$2"
+  local main_path path config draft_path
+  local model_url model_sha draft_url draft_sha mmproj_url mmproj_sha mmproj_path
+  local -a flags
+
+  case "$engine" in
+    vllm)
+      main_path="$(first_profile_arg "$profile_file")"
+      emit_artifact hf "$main_path" "${main_path#/models/}" \
+        "$(hf_revision_for "$main_path" "$profile_file")"
+
+      flags=(--model --speculative-model --draft-model)
+      for flag in "${flags[@]}"; do
+        path="$(arg_value "$flag" "$profile_file" || true)"
+        [[ -n "$path" ]] || continue
+        emit_artifact hf "$path" "${path#/models/}" \
+          "$(hf_revision_for "$path" "$profile_file")"
+      done
+
+      config="$(arg_value --speculative-config "$profile_file" || true)"
+      if [[ -n "$config" ]]; then
+        require_command jq
+        if ! draft_path="$(printf '%s\n' "$config" | jq -er 'if type == "object" then (.model // "") else error("not an object") end')"; then
+          printf 'Invalid --speculative-config in %s\n' "$profile_file" >&2
+          return 64
+        fi
+        if [[ -n "$draft_path" ]]; then
+          emit_artifact hf "$draft_path" "${draft_path#/models/}" \
+            "$(hf_revision_for "$draft_path" "$profile_file")"
+        fi
+      fi
+      ;;
+    llamacpp)
+      main_path="$(arg_value --model "$profile_file" || true)"
+      model_url="$(metadata_value model-url "$profile_file")"
+      model_sha="$(metadata_value model-sha256 "$profile_file")"
+      emit_artifact gguf "$main_path" "$model_url" "$model_sha"
+
+      draft_path="$(arg_value --spec-draft-model "$profile_file" || true)"
+      [[ -n "$draft_path" ]] || draft_path="$(arg_value --model-draft "$profile_file" || true)"
+      [[ -n "$draft_path" ]] || draft_path="$(arg_value --draft-model "$profile_file" || true)"
+      draft_url="$(metadata_value draft-model-url "$profile_file")"
+      draft_sha="$(metadata_value draft-model-sha256 "$profile_file")"
+      emit_artifact draft "$draft_path" "$draft_url" "$draft_sha"
+
+      mmproj_path="$(arg_value --mmproj "$profile_file" || true)"
+      mmproj_url="$(metadata_value mmproj-url "$profile_file")"
+      mmproj_sha="$(metadata_value mmproj-sha256 "$profile_file")"
+      emit_artifact mmproj "$mmproj_path" "$mmproj_url" "$mmproj_sha"
+
+      extra_profile_artifacts "$profile_file"
+      ;;
+  esac
+}
+
+container_to_host() {
+  local engine="$1"
+  local container_path="$2"
+  local source="$3"
+  local root relative_path host_path canonical_root canonical_parent
+
+  root="$(engine_model_root "$engine")"
+  case "$engine" in
+    vllm)
+      if [[ ! "$container_path" =~ ^/models/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+        printf 'Unsafe vLLM model path in %s: %s\n' "$source" "$container_path" >&2
+        return 64
+      fi
+      ;;
+    llamacpp)
+      if [[ "$container_path" != /models/?* ||
+            "$container_path" == *'/../'* || "$container_path" == */.. ||
+            "$container_path" == *'/./'* || "$container_path" == */. ]]; then
+        printf 'Unsafe llama.cpp model path in %s: %s\n' "$source" "$container_path" >&2
+        return 64
+      fi
+      ;;
+  esac
+
+  relative_path="${container_path#/models/}"
+  host_path="$root/$relative_path"
+  canonical_root="$(realpath -m -- "$root")"
+  canonical_parent="$(realpath -m -- "$(dirname -- "$host_path")")"
+  if [[ "$canonical_parent" != "$canonical_root" &&
+        "$canonical_parent" != "$canonical_root"/* ]]; then
+    printf 'Model path escapes %s through a parent symlink: %s\n' \
+      "$canonical_root" "$host_path" >&2
+    return 64
+  fi
+  printf '%s\n' "$host_path"
+}
+
+artifact_ready() {
+  local engine="$1"
+  local host_path="$2"
+  case "$engine" in
+    vllm) [[ -d "$host_path" && -r "$host_path/config.json" ]] ;;
+    llamacpp) [[ -f "$host_path" && -r "$host_path" ]] ;;
+  esac
+}
+
+profile_artifact_state() {
+  local engine="$1"
+  local profile_file="$2"
+  local records kind container_path source checksum host_path
+  local count=0 missing=0
+
+  if ! records="$(profile_artifacts "$engine" "$profile_file")"; then
+    printf 'invalid\n'
+    return 0
+  fi
+  while IFS=$'\t' read -r kind container_path source checksum; do
+    [[ -n "$container_path" ]] || continue
+    count=$((count + 1))
+    if ! host_path="$(container_to_host "$engine" "$container_path" "$profile_file")"; then
+      printf 'invalid\n'
+      return 0
+    fi
+    artifact_ready "$engine" "$host_path" || missing=$((missing + 1))
+  done <<< "$records"
+
+  if (( count == 0 )); then
+    printf 'invalid\n'
+  elif (( missing == 0 )); then
+    printf 'ready(%d)\n' "$count"
+  else
+    printf 'missing(%d/%d)\n' "$missing" "$count"
+  fi
+}
+
+compose_for() {
+  local engine="$1"
+  local profile="$2"
+  shift 2
+  local directory compose_file profile_env
+
+  directory="$(engine_dir "$engine")"
+  compose_file="$directory/compose.yaml"
+  profile_env="$(engine_profile_env "$engine")"
+  env "$profile_env=$profile" docker compose \
+    --project-directory "$directory" \
+    -f "$compose_file" \
+    "$@"
+}
+
+configured_image() {
+  local engine="$1"
+  local profile="$2"
+  compose_for "$engine" "$profile" config --images | head -n 1
+}
+
+require_configured_image() {
+  local engine="$1"
+  local profile="$2"
+  local image
+
+  image="$(configured_image "$engine" "$profile")"
+  [[ -n "$image" ]] || die 66 "Compose did not resolve an image for $engine."
+  if ! docker image inspect "$image" >/dev/null 2>&1; then
+    case "$engine" in
+      vllm) die 66 "Container image is missing. Run: ./dgx-model image pull vllm" ;;
+      llamacpp) die 66 "Container image is missing. Run: ./dgx-model image build llamacpp" ;;
+    esac
+  fi
+}
+
+container_profile() {
+  local engine="$1"
+  local container
+  container="$(engine_container "$engine")"
+  docker inspect --format '{{if .Config.Cmd}}{{index .Config.Cmd 0}}{{end}}' \
+    "$container" 2>/dev/null || true
+}
+
+container_status() {
+  local engine="$1"
+  local container
+  container="$(engine_container "$engine")"
+  docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true
+}
+
+container_runtime_state() {
+  local engine="$1"
+  local container status health
+  container="$(engine_container "$engine")"
+  status="$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)"
+  [[ -n "$status" ]] || {
+    printf 'absent\n'
+    return
+  }
+  health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container" 2>/dev/null || true)"
+  if [[ -n "$health" ]]; then
+    printf '%s/%s\n' "$status" "$health"
+  else
+    printf '%s\n' "$status"
+  fi
+}
+
+container_uses_memory() {
+  case "$(container_status "$1")" in
+    created|running|paused|restarting) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+acquire_lock() {
+  require_command flock
+  exec 9>"$lock_file"
+  flock -n 9 || die 75 "Another dgx-model operation is already in progress."
+}
+
+list_profiles() {
+  local filter="${1:-}"
+  local engine directory profile_file profile api_name context artifacts runtime active_profile marker model
+  local -a engines=(vllm llamacpp)
+
+  if [[ -n "$filter" ]]; then
+    require_engine "$filter"
+    engines=("$filter")
+  fi
+
+  printf '%-10s %-30s %-27s %-9s %-14s %-20s %s\n' \
+    ENGINE PROFILE API_NAME CONTEXT MODELS RUNTIME MODEL
+  for engine in "${engines[@]}"; do
+    directory="$(engine_dir "$engine")"
+    active_profile="$(container_profile "$engine")"
+    runtime="$(container_runtime_state "$engine")"
+    while IFS= read -r profile_file; do
+      profile="${profile_file##*/}"
+      profile="${profile%.args}"
+      marker=""
+      [[ "$profile" == "$active_profile" ]] && marker="*"
+      if [[ "$engine" == vllm ]]; then
+        model="$(first_profile_arg "$profile_file")"
+        api_name="$(arg_value --served-model-name "$profile_file" || true)"
+        context="$(arg_value --max-model-len "$profile_file" || true)"
+      else
+        model="$(arg_value --model "$profile_file" || true)"
+        api_name="$(arg_value --alias "$profile_file" || true)"
+        context="$(arg_value --ctx-size "$profile_file" || true)"
+      fi
+      artifacts="$(profile_artifact_state "$engine" "$profile_file")"
+      printf '%-10s %-30s %-27s %-9s %-14s %-20s %s\n' \
+        "$engine" "${marker}${profile}" "${api_name:--}" "${context:--}" \
+        "$artifacts" "$([[ "$profile" == "$active_profile" ]] && printf '%s' "$runtime" || printf '-')" \
+        "${model#/models/}"
+    done < <(find "$directory/profiles" -maxdepth 1 -type f -name '*.args' -print | sort)
+  done
+}
+
+show_profile() {
+  local engine="$1"
+  local profile="$2"
+  local profile_file image active_profile runtime records
+  local kind container_path source checksum host_path state
+
+  profile_file="$(profile_file_for "$engine" "$profile")"
+  image="$(configured_image "$engine" "$profile")"
+  active_profile="$(container_profile "$engine")"
+  runtime="$(container_runtime_state "$engine")"
+
+  printf 'engine:       %s\n' "$engine"
+  printf 'profile:      %s\n' "$profile"
+  printf 'profile_file: %s\n' "$profile_file"
+  printf 'image:        %s\n' "$image"
+  printf 'active:       %s\n' "$([[ "$profile" == "$active_profile" ]] && printf yes || printf no)"
+  printf 'runtime:      %s\n' "$runtime"
+  printf 'artifacts:\n'
+  records="$(profile_artifacts "$engine" "$profile_file")"
+  while IFS=$'\t' read -r kind container_path source checksum; do
+    [[ -n "$container_path" ]] || continue
+    host_path="$(container_to_host "$engine" "$container_path" "$profile_file")"
+    state=missing
+    artifact_ready "$engine" "$host_path" && state=ready
+    printf '  - kind: %s\n    state: %s\n    container: %s\n    host: %s\n' \
+      "$kind" "$state" "$container_path" "$host_path"
+    [[ -n "$source" ]] && printf '    source: %s\n' "$source"
+    [[ -n "$checksum" ]] && printf '    revision_or_sha256: %s\n' "$checksum"
+  done <<< "$records"
+  printf 'arguments:\n'
+  while IFS= read -r arg; do
+    printf '  %s\n' "$arg"
+  done < <(read_profile_args "$profile_file")
+}
+
+validate_profile() {
+  local engine="$1"
+  local profile="$2"
+  local require_artifacts="${3:-1}"
+  local profile_file records kind container_path source checksum host_path count=0 missing=0
+
+  profile_file="$(profile_file_for "$engine" "$profile")"
+  compose_for "$engine" "$profile" config --quiet
+  records="$(profile_artifacts "$engine" "$profile_file")"
+  while IFS=$'\t' read -r kind container_path source checksum; do
+    [[ -n "$container_path" ]] || continue
+    count=$((count + 1))
+    host_path="$(container_to_host "$engine" "$container_path" "$profile_file")"
+    if (( require_artifacts == 1 )) && ! artifact_ready "$engine" "$host_path"; then
+      printf 'Missing %s artifact: %s\n' "$kind" "$host_path" >&2
+      missing=$((missing + 1))
+    fi
+    if [[ "$engine" == llamacpp ]]; then
+      [[ -n "$source" ]] || {
+        printf 'Missing download URL for %s in %s\n' "$kind" "$profile_file" >&2
+        missing=$((missing + 1))
+      }
+      [[ "$checksum" =~ ^[0-9a-fA-F]{64}$ ]] || {
+        printf 'Missing or invalid SHA-256 for %s in %s\n' "$kind" "$profile_file" >&2
+        missing=$((missing + 1))
+      }
+    fi
+  done <<< "$records"
+  (( count > 0 )) || die 64 "Profile has no model artifacts: $profile_file"
+  (( missing == 0 )) || return 66
+
+  if (( require_artifacts == 1 )); then
+    require_configured_image "$engine" "$profile"
+  fi
+  printf 'Validated %s/%s: %d artifact(s).\n' "$engine" "$profile" "$count"
+}
+
+verify_sha256() {
+  local path="$1"
+  local expected="$2"
+  local quiet="${3:-0}"
+  local actual
+
+  actual="$(sha256_for "$path")"
+
+  if [[ "$actual" != "$expected" ]]; then
+    if (( quiet == 0 )); then
+      printf 'SHA-256 mismatch for %s\nexpected: %s\nactual:   %s\n' \
+        "$path" "$expected" "$actual" >&2
+    fi
+    return 1
+  fi
+}
+
+sha256_for() {
+  local path="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$path" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$path" | awk '{print $1}'
+  else
+    die 69 'sha256sum or shasum is required.'
+  fi
+}
+
+pull_llama_artifact() {
+  local kind="$1"
+  local host_path="$2"
+  local url="$3"
+  local checksum="$4"
+  local force="$5"
+  local partial_path="${host_path}.part"
+
+  [[ -n "$url" ]] || die 64 "No download URL is configured for $kind: $host_path"
+  [[ "$checksum" =~ ^[0-9a-fA-F]{64}$ ]] ||
+    die 64 "No valid SHA-256 is configured for $kind: $host_path"
+
+  if [[ -f "$host_path" ]] && verify_sha256 "$host_path" "$checksum" 1; then
+    printf 'Already present and verified: %s\n' "$host_path"
+    return 0
+  fi
+  if [[ -e "$host_path" && ! -f "$host_path" ]]; then
+    die 64 "Refusing to replace non-file model path: $host_path"
+  fi
+  if [[ -f "$host_path" && "$force" != 1 ]]; then
+    verify_sha256 "$host_path" "$checksum"
+    return 1
+  fi
+
+  mkdir -p "$(dirname -- "$host_path")"
+  if [[ -f "$partial_path" ]] && verify_sha256 "$partial_path" "$checksum" 1; then
+    mv -- "$partial_path" "$host_path"
+    printf 'Completed verified partial download: %s\n' "$host_path"
+    return 0
+  fi
+
+  printf 'Downloading %s to %s\n' "$kind" "$partial_path"
+  if (( force == 1 )); then
+    curl --fail --location --show-error --output "$partial_path" "$url"
+  else
+    curl --fail --location --show-error --continue-at - --output "$partial_path" "$url"
+  fi
+  verify_sha256 "$partial_path" "$checksum"
+  mv -- "$partial_path" "$host_path"
+  printf 'Downloaded and verified: %s\n' "$host_path"
+}
+
+pull_llama_hf_artifact() {
+  local kind="$1"
+  local host_path="$2"
+  local repo_id="$3"
+  local filename="$4"
+  local revision="$5"
+  local checksum="$6"
+  local force="$7"
+  local -a hf_args=()
+
+  [[ "$checksum" =~ ^[0-9a-fA-F]{64}$ ]] ||
+    die 64 "No valid SHA-256 is configured for $kind: $host_path"
+  if [[ -f "$host_path" ]] && verify_sha256 "$host_path" "$checksum" 1; then
+    printf 'Already present and verified: %s\n' "$host_path"
+    return 0
+  fi
+  if [[ -e "$host_path" && ! -f "$host_path" ]]; then
+    die 64 "Refusing to replace non-file model path: $host_path"
+  fi
+  if [[ -f "$host_path" && "$force" != 1 ]]; then
+    verify_sha256 "$host_path" "$checksum"
+    return 1
+  fi
+
+  require_command hf
+  printf 'Synchronizing pinned Hugging Face GGUF %s/%s to %s\n' \
+    "$repo_id" "$filename" "$host_path"
+  hf_args=(download "$repo_id" "$filename" --revision "$revision" \
+    --local-dir "$(engine_model_root llamacpp)/$repo_id")
+  (( force == 1 )) && hf_args+=(--force-download)
+  hf "${hf_args[@]}"
+  [[ -f "$host_path" ]] || die 66 "Hugging Face did not create expected artifact: $host_path"
+  verify_sha256 "$host_path" "$checksum"
+  printf 'Downloaded and verified: %s\n' "$host_path"
+}
+
+pull_models() {
+  local engine="$1"
+  local profile="$2"
+  local force="${3:-0}"
+  local lock_held="${4:-0}"
+  local profile_file records kind container_path source checksum host_path revision
+  local hf_model hf_revision_id hf_filename hf_prefix
+  local -a hf_args=()
+
+  profile_file="$(profile_file_for "$engine" "$profile")"
+  validate_profile "$engine" "$profile" 0 >/dev/null
+  (( lock_held == 1 )) || acquire_lock
+  records="$(profile_artifacts "$engine" "$profile_file")"
+
+  case "$engine" in
+    vllm)
+      require_command hf
+      while IFS=$'\t' read -r kind container_path source checksum; do
+        [[ -n "$container_path" ]] || continue
+        host_path="$(container_to_host "$engine" "$container_path" "$profile_file")"
+        revision="$checksum"
+        printf 'Synchronizing Hugging Face model %s to %s\n' "$source" "$host_path"
+        hf_args=(download "$source" --local-dir "$host_path")
+        [[ -n "$revision" ]] && hf_args+=(--revision "$revision")
+        (( force == 1 )) && hf_args+=(--force-download)
+        hf "${hf_args[@]}"
+        artifact_ready "$engine" "$host_path" ||
+          die 66 "Downloaded model is missing config.json: $host_path"
+      done <<< "$records"
+      ;;
+    llamacpp)
+      hf_model="$(metadata_value hf-model "$profile_file")"
+      hf_revision_id="$(metadata_value hf-revision-id "$profile_file")"
+      hf_prefix="/models/${hf_model}/"
+      while IFS=$'\t' read -r kind container_path source checksum; do
+        [[ -n "$container_path" ]] || continue
+        host_path="$(container_to_host "$engine" "$container_path" "$profile_file")"
+        if [[ "$hf_model" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ &&
+              "$hf_revision_id" =~ ^[0-9a-fA-F]{40,64}$ &&
+              "$container_path" == "$hf_prefix"?* ]]; then
+          hf_filename="${container_path#"$hf_prefix"}"
+          pull_llama_hf_artifact "$kind" "$host_path" "$hf_model" \
+            "$hf_filename" "$hf_revision_id" "$checksum" "$force"
+        else
+          pull_llama_artifact "$kind" "$host_path" "$source" "$checksum" "$force"
+        fi
+      done <<< "$records"
+      ;;
+  esac
+}
+
+search_hf_models() {
+  local query="$1"
+  local limit="$2"
+  local json_output="$3"
+  local sort_field="$4"
+  local results result_index=0
+  local -a hf_args=(
+    models list
+    --sort "$sort_field"
+    --limit "$limit"
+    --expand downloads,likes,pipeline_tag,tags,sha,gated,siblings
+    --json
+  )
+
+  require_command hf
+  require_command jq
+  case "$sort_field" in
+    downloads|likes|trending_score|last_modified|created_at) ;;
+    *)
+      die 64 'Search sort must be one of: downloads, likes, trending_score, last_modified, created_at.'
+      ;;
+  esac
+  [[ "$limit" =~ ^[1-9][0-9]*$ ]] ||
+    die 64 'Hugging Face search limit must be between 1 and 100.'
+  limit=$((10#$limit))
+  (( limit <= 100 )) || die 64 'Hugging Face search limit must be between 1 and 100.'
+  [[ -z "$query" ]] || hf_args+=("--search=$query")
+
+  results="$(hf "${hf_args[@]}")"
+  results="$(printf '%s\n' "$results" | jq -c '
+    def tags_lower: [(.tags // [])[] | ascii_downcase];
+    def filenames: [(.siblings // [])[] | .rfilename? // empty];
+    def has_tag($pattern): tags_lower | any(test($pattern));
+    def has_file($pattern): filenames | any(test($pattern; "i"));
+    def supports_llamacpp:
+      has_tag("(^|:)gguf$") or has_file("[.]gguf$");
+    def supports_vllm:
+      (
+        has_tag("^vllm$") or
+        (has_file("(^|/)config[.]json$") and has_file("[.](safetensors|bin)$"))
+      ) and
+      ((.pipeline_tag // "") | test("^(text-generation|image-text-to-text|text2text-generation)$")) and
+      (has_tag("^(mlx|onnx|coreml|tflite)$") | not);
+    map(
+      . + {
+        supported_engines: [
+          if supports_vllm then "vllm" else empty end,
+          if supports_llamacpp then "llamacpp" else empty end
+        ]
+      } |
+      del(.siblings)
+    )
+  ')"
+  if (( json_output == 1 )); then
+    printf '%s\n' "$results" | jq .
+    return
+  fi
+
+  printf 'Found %s model(s).\n\n' "$(printf '%s\n' "$results" | jq 'length')"
+  printf '%s\n' "$results" | jq -r '
+    .[] |
+    [
+      .id,
+      (if (.supported_engines | length) > 0 then (.supported_engines | join(",")) else "-" end),
+      ((.downloads // 0) | tostring),
+      ((.likes // 0) | tostring),
+      (.pipeline_tag // "-"),
+      ((.sha // "-")[0:12])
+    ] | @tsv
+  ' | while IFS=$'\t' read -r model_id engines downloads likes task revision; do
+    result_index=$((result_index + 1))
+    printf '[%d] %s\n' "$result_index" "$model_id"
+    printf '    engines: %-20s task: %s\n' "$engines" "$task"
+    printf '    downloads: %-12s likes: %-8s revision: %s\n\n' \
+      "$downloads" "$likes" "$revision"
+  done
+}
+
+show_hf_model_card() {
+  local model_id="$1"
+  local output_mode="$2"
+  local json_output="$3"
+  local raw_output="$4"
+  local -a hf_args=(models card "$model_id")
+
+  require_command hf
+  [[ "$model_id" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] ||
+    die 64 "Unsafe Hugging Face model ID: $model_id"
+  [[ -z "$output_mode" ]] || hf_args+=("$output_mode")
+  (( json_output == 0 )) || hf_args+=(--json)
+  if (( raw_output == 0 && json_output == 0 )) && [[ "$output_mode" != --metadata ]]; then
+    require_command python3
+    [[ -r "$markdown_renderer" ]] || die 66 "Missing Markdown renderer: $markdown_renderer"
+    [[ -n "$output_mode" ]] || hf_args+=(--text)
+    hf "${hf_args[@]}" | python3 "$markdown_renderer"
+  else
+    hf "${hf_args[@]}"
+  fi
+}
+
+install_hf_model() {
+  local engine="$1"
+  local model_id="$2"
+  local requested_profile="$3"
+  local gguf_file="$4"
+  local force="$5"
+  local info_file card_file plan_file revision profile directory profile_file model_root
+  local filename container_path host_path checksum state
+  local checksums='{}'
+  local -a hf_args=() plan_args=()
+
+  require_engine "$engine"
+  require_command hf
+  require_command jq
+  require_command python3
+  [[ -r "$hf_profile_helper" ]] || die 66 "Missing Hugging Face profile helper: $hf_profile_helper"
+  [[ "$model_id" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] ||
+    die 64 "Unsafe Hugging Face model ID: $model_id"
+  if [[ -n "$requested_profile" && ! "$requested_profile" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+    die 64 "Invalid profile name: $requested_profile"
+  fi
+  [[ "$engine" == llamacpp || -z "$gguf_file" ]] ||
+    die 64 '--gguf is only valid for the llamacpp engine.'
+
+  hf_install_temp_dir="$(mktemp -d)"
+  hf_install_staged_profile=""
+  trap 'rm -rf -- "$hf_install_temp_dir"; [[ -z "$hf_install_staged_profile" ]] || rm -f -- "$hf_install_staged_profile"' EXIT
+  info_file="$hf_install_temp_dir/info.json"
+  card_file="$hf_install_temp_dir/card.md"
+  plan_file="$hf_install_temp_dir/plan.json"
+
+  printf 'Reading Hugging Face metadata and model card for %s\n' "$model_id"
+  hf models info "$model_id" \
+    --expand downloads,likes,tags,sha,siblings,config,safetensors,gguf,cardData,pipeline_tag,gated,usedStorage \
+    --json > "$info_file"
+  if ! hf models card "$model_id" > "$card_file"; then
+    printf 'Warning: no readable model card; using repository metadata and conservative defaults.\n' >&2
+    : > "$card_file"
+  fi
+  plan_args=(
+    plan
+    --engine "$engine"
+    --model-id "$model_id"
+    --info "$info_file"
+    --card "$card_file"
+  )
+  [[ -z "$gguf_file" ]] || plan_args+=(--gguf "$gguf_file")
+  python3 "$hf_profile_helper" "${plan_args[@]}" > "$plan_file"
+
+  revision="$(jq -er '.revision' "$plan_file")"
+  profile="${requested_profile:-$(jq -er '.profile' "$plan_file")}"
+  [[ "$profile" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || die 64 "Invalid generated profile name: $profile"
+  directory="$(engine_dir "$engine")"
+  profile_file="$directory/profiles/${profile}.args"
+  model_root="$(engine_model_root "$engine")"
+
+  acquire_lock
+  if [[ -e "$profile_file" && "$force" != 1 ]]; then
+    die 73 "Profile already exists: $engine/$profile. Use --profile NAME or --force."
+  fi
+  if [[ -e "$profile_file" && "$(container_profile "$engine")" == "$profile" ]]; then
+    die 75 "Cannot replace the profile used by the existing container. Run: ./dgx-model stop $engine"
+  fi
+
+  case "$engine" in
+    vllm)
+      host_path="$(container_to_host vllm "/models/$model_id" "$model_id")"
+      printf 'Downloading pinned Hugging Face snapshot %s@%s\n' "$model_id" "$revision"
+      hf_args=(download "$model_id" --revision "$revision" --local-dir "$host_path")
+      (( force == 1 )) && hf_args+=(--force-download)
+      hf "${hf_args[@]}"
+      artifact_ready vllm "$host_path" ||
+        die 66 "Downloaded model is missing config.json: $host_path"
+      ;;
+    llamacpp)
+      while IFS=$'\t' read -r filename container_path; do
+        [[ -n "$filename" && -n "$container_path" ]] || continue
+        host_path="$(container_to_host llamacpp "$container_path" "$model_id")"
+        printf 'Downloading pinned GGUF artifact %s/%s\n' "$model_id" "$filename"
+        hf_args=(download "$model_id" "$filename" --revision "$revision" --local-dir "$model_root/$model_id")
+        (( force == 1 )) && hf_args+=(--force-download)
+        hf "${hf_args[@]}"
+        [[ -f "$host_path" ]] || die 66 "Hugging Face did not create expected artifact: $host_path"
+        checksum="$(sha256_for "$host_path")"
+        checksums="$(jq -cn \
+          --argjson current "$checksums" --arg filename "$filename" --arg checksum "$checksum" \
+          '$current + {($filename): $checksum}')"
+      done < <(jq -r '.artifacts[] | [.filename, .container_path] | @tsv' "$plan_file")
+      ;;
+  esac
+
+  hf_install_staged_profile="$(mktemp "$directory/profiles/.dgx-model-${profile}.XXXXXX")"
+  python3 "$hf_profile_helper" render \
+    --plan "$plan_file" \
+    --checksums-json "$checksums" > "$hf_install_staged_profile"
+  chmod 0644 "$hf_install_staged_profile"
+  mv -- "$hf_install_staged_profile" "$profile_file"
+  hf_install_staged_profile=""
+
+  state="$(profile_artifact_state "$engine" "$profile_file")"
+  [[ "$state" == ready\(* ]] || die 66 "Installed profile is not ready: $state"
+  printf 'Installed and downloaded %s/%s from %s@%s (%s).\n' \
+    "$engine" "$profile" "$model_id" "$revision" "$state"
+  printf 'Review with: ./dgx-model show %s %s\n' "$engine" "$profile"
+
+  rm -rf -- "$hf_install_temp_dir"
+  trap - EXIT
+}
+
+wait_until_healthy() {
+  local engine="$1"
+  local container port deadline status health restart_count absent_count=0
+
+  container="$(engine_container "$engine")"
+  port="$(engine_port "$engine")"
+  deadline=$((SECONDS + 900))
+
+  while (( SECONDS < deadline )); do
+    status="$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)"
+    health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container" 2>/dev/null || true)"
+    case "$status/$health" in
+      running/healthy)
+        if curl --fail --silent --show-error "http://127.0.0.1:${port}/v1/models"; then
+          printf '\n'
+          return 0
+        fi
+        ;;
+      running/unhealthy)
+        printf '%s became unhealthy while starting.\n' "$engine" >&2
+        docker logs --tail 160 "$container" >&2 || true
+        return 1
+        ;;
+      exited/*|dead/*)
+        printf '%s failed while starting (state=%s).\n' "$engine" "$status" >&2
+        docker logs --tail 160 "$container" >&2 || true
+        return 1
+        ;;
+      restarting/*)
+        restart_count="$(docker inspect --format '{{.RestartCount}}' "$container" 2>/dev/null || printf 0)"
+        if [[ "$restart_count" =~ ^[0-9]+$ ]] && (( restart_count >= 2 )); then
+          printf '%s repeatedly restarted while starting (restart_count=%s).\n' \
+            "$engine" "$restart_count" >&2
+          docker logs --tail 160 "$container" >&2 || true
+          return 1
+        fi
+        ;;
+      /)
+        absent_count=$((absent_count + 1))
+        if (( absent_count >= 2 )); then
+          printf '%s container disappeared while starting.\n' "$engine" >&2
+          return 1
+        fi
+        ;;
+    esac
+    sleep 5
+  done
+
+  printf 'Timed out waiting 900 seconds for %s health.\n' "$engine" >&2
+  docker logs --tail 160 "$container" >&2 || true
+  return 1
+}
+
+stop_engine() {
+  local engine="$1"
+  local force="$2"
+  local profile
+
+  profile="$(container_profile "$engine")"
+  # Compose requires the profile environment variable even for `down`, but it
+  # never reads the corresponding args file while removing the project.
+  [[ "$profile" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || profile=stop
+  if (( force == 1 )); then
+    compose_for "$engine" "$profile" down --timeout 0
+  else
+    compose_for "$engine" "$profile" down
+  fi
+}
+
+use_profile() {
+  local engine="$1"
+  local profile="$2"
+  local recreate="$3"
+  local other current_profile runtime
+
+  acquire_lock
+  validate_profile "$engine" "$profile" 1
+  other="$(other_engine "$engine")"
+
+  current_profile="$(container_profile "$engine")"
+  runtime="$(container_runtime_state "$engine")"
+  if container_uses_memory "$other"; then
+    printf 'Stopping active %s engine before switching to %s/%s.\n' \
+      "$other" "$engine" "$profile"
+    stop_engine "$other" 0
+  fi
+
+  if [[ "$current_profile" == "$profile" && "$runtime" == running/healthy && "$recreate" != 1 ]]; then
+    printf '%s/%s is already running and healthy. Use --recreate to replace it.\n' \
+      "$engine" "$profile"
+    return 0
+  fi
+
+  compose_for "$engine" "$profile" up -d --no-build --force-recreate --remove-orphans
+  wait_until_healthy "$engine"
+  printf 'Active model: %s/%s\n' "$engine" "$profile"
+}
+
+status_engine() {
+  local engine="$1"
+  local container profile runtime port
+  container="$(engine_container "$engine")"
+  profile="$(container_profile "$engine")"
+  runtime="$(container_runtime_state "$engine")"
+  port="$(engine_port "$engine")"
+
+  printf 'engine=%s container=%s profile=%s state=%s\n' \
+    "$engine" "$container" "${profile:--}" "$runtime"
+  if [[ "$runtime" == running/healthy ]]; then
+    curl --fail --silent --show-error "http://127.0.0.1:${port}/v1/models" || true
+    printf '\n'
+  fi
+}
+
+smoke_engine() {
+  local engine="$1"
+  local profile profile_file model port payload response
+  require_command jq
+  profile="$(container_profile "$engine")"
+  [[ -n "$profile" ]] || die 69 "No $engine container is active."
+  [[ "$(container_runtime_state "$engine")" == running/healthy ]] ||
+    die 69 "$engine is not healthy."
+  profile_file="$(profile_file_for "$engine" "$profile")"
+  case "$engine" in
+    vllm) model="$(arg_value --served-model-name "$profile_file")" ;;
+    llamacpp) model="$(arg_value --alias "$profile_file")" ;;
+  esac
+  port="$(engine_port "$engine")"
+  payload="$(jq -nc --arg model "$model" '{
+    model: $model,
+    messages: [{role: "user", content: "Reply exactly with: DGX MODEL OK"}],
+    chat_template_kwargs: {enable_thinking: false},
+    temperature: 0,
+    max_tokens: 32
+  }')"
+  response="$(curl --fail --silent --show-error \
+    "http://127.0.0.1:${port}/v1/chat/completions" \
+    -H 'Content-Type: application/json' \
+    --data "$payload")"
+  printf '%s\n' "$response" | jq .
+  printf '%s\n' "$response" |
+    jq -e '((.choices[0].message.content // .choices[0].text // "") | length) > 0' >/dev/null ||
+    die 1 'Chat completion returned no assistant content.'
+}
+
+model_data_key() {
+  local engine="$1"
+  local host_path="$2"
+  local directory basename total_shards
+
+  if [[ "$engine" == vllm ]]; then
+    printf '%s\n' "$host_path"
+    return
+  fi
+  directory="${host_path%/*}"
+  basename="${host_path##*/}"
+  if [[ "$basename" =~ ^(.+)-[0-9]{5}-of-([0-9]{5})[.]gguf$ ]]; then
+    total_shards=$((10#${BASH_REMATCH[2]}))
+    (( total_shards >= 1 && total_shards <= 1000 )) ||
+      die 64 "Unsafe GGUF shard count in $host_path"
+    printf '%s/%s-*-of-%05d.gguf\n' \
+      "$directory" "${BASH_REMATCH[1]}" "$total_shards"
+  else
+    printf '%s\n' "$host_path"
+  fi
+}
+
+artifact_shared_by() {
+  local engine="$1"
+  local target_profile_file="$2"
+  local target_key="$3"
+  local directory other_file other_profile records kind container_path source checksum host_path key
+  local shared=""
+
+  directory="$(engine_dir "$engine")"
+  while IFS= read -r other_file; do
+    [[ "$other_file" == "$target_profile_file" ]] && continue
+    other_profile="${other_file##*/}"
+    other_profile="${other_profile%.args}"
+    records="$(profile_artifacts "$engine" "$other_file")"
+    while IFS=$'\t' read -r kind container_path source checksum; do
+      [[ -n "$container_path" ]] || continue
+      host_path="$(container_to_host "$engine" "$container_path" "$other_file")"
+      key="$(model_data_key "$engine" "$host_path")"
+      if [[ "$key" == "$target_key" ]]; then
+        shared="${shared:+${shared}, }${other_profile}"
+      fi
+    done <<< "$records"
+  done < <(find "$directory/profiles" -maxdepth 1 -type f -name '*.args' -print | sort)
+  printf '%s\n' "$shared"
+}
+
+delete_vllm_data() {
+  local host_path="$1"
+  if [[ -L "$host_path" ]]; then
+    rm -- "$host_path"
+  elif [[ -d "$host_path" ]]; then
+    rm -rf --one-file-system -- "$host_path"
+  elif [[ -e "$host_path" ]]; then
+    die 64 "Refusing to remove non-directory vLLM model path: $host_path"
+  else
+    printf 'Model data already absent: %s\n' "$host_path"
+    return
+  fi
+  printf 'Removed model data: %s\n' "$host_path"
+}
+
+delete_llama_data() {
+  local host_path="$1"
+  local directory basename prefix total_shards shard candidate path removed=0
+  local -a candidates=()
+
+  directory="${host_path%/*}"
+  basename="${host_path##*/}"
+  if [[ "$basename" =~ ^(.+)-[0-9]{5}-of-([0-9]{5})[.]gguf$ ]]; then
+    prefix="${BASH_REMATCH[1]}"
+    total_shards=$((10#${BASH_REMATCH[2]}))
+    for ((shard = 1; shard <= total_shards; shard++)); do
+      printf -v candidate '%s/%s-%05d-of-%05d.gguf' \
+        "$directory" "$prefix" "$shard" "$total_shards"
+      candidates+=("$candidate" "${candidate}.part")
+    done
+  else
+    candidates+=("$host_path" "${host_path}.part")
+  fi
+  for path in "${candidates[@]}"; do
+    if [[ -f "$path" || -L "$path" ]]; then
+      rm -- "$path"
+      printf 'Removed model data: %s\n' "$path"
+      removed=1
+    elif [[ -e "$path" ]]; then
+      die 64 "Refusing to remove non-file llama.cpp model path: $path"
+    fi
+  done
+  (( removed == 1 )) || printf 'Model data already absent: %s\n' "$host_path"
+}
+
+remove_profile() {
+  local engine="$1"
+  local profile="$2"
+  local delete_files="$3"
+  local profile_file active_profile records kind container_path source checksum host_path key shared
+  local -a paths=() keys=() shared_by=()
+  local duplicate existing_key i
+
+  acquire_lock
+  profile_file="$(profile_file_for "$engine" "$profile")"
+  active_profile="$(container_profile "$engine")"
+  if [[ "$active_profile" == "$profile" ]]; then
+    die 75 "Cannot remove the profile used by the existing container. Run: ./dgx-model stop $engine"
+  fi
+
+  if (( delete_files == 1 )); then
+    records="$(profile_artifacts "$engine" "$profile_file")"
+    while IFS=$'\t' read -r kind container_path source checksum; do
+      [[ -n "$container_path" ]] || continue
+      host_path="$(container_to_host "$engine" "$container_path" "$profile_file")"
+      key="$(model_data_key "$engine" "$host_path")"
+      duplicate=0
+      for existing_key in "${keys[@]}"; do
+        [[ "$existing_key" == "$key" ]] && duplicate=1
+      done
+      if (( duplicate == 0 )); then
+        paths+=("$host_path")
+        keys+=("$key")
+        shared_by+=("$(artifact_shared_by "$engine" "$profile_file" "$key")")
+      fi
+    done <<< "$records"
+  fi
+
+  rm -- "$profile_file"
+  printf 'Removed profile: %s/%s\n' "$engine" "$profile"
+  if (( delete_files == 0 )); then
+    printf 'Model data retained. Use --delete-files to remove unshared artifacts.\n'
+    return
+  fi
+
+  for ((i = 0; i < ${#paths[@]}; i++)); do
+    if [[ -n "${shared_by[i]}" ]]; then
+      printf 'Model data retained (used by %s): %s\n' "${shared_by[i]}" "${paths[i]}"
+    elif [[ "$engine" == vllm ]]; then
+      delete_vllm_data "${paths[i]}"
+    else
+      delete_llama_data "${paths[i]}"
+    fi
+  done
+}
+
+action="${1:-}"
+case "$action" in
+  list)
+    (( $# <= 2 )) || die 64 'Usage: ./dgx-model list [vllm|llamacpp]'
+    list_profiles "${2:-}"
+    ;;
+  show)
+    (( $# == 3 )) || die 64 'Usage: ./dgx-model show <engine> <profile>'
+    require_engine "$2"
+    show_profile "$2" "$3"
+    ;;
+  validate)
+    (( $# == 3 )) || die 64 'Usage: ./dgx-model validate <engine> <profile>'
+    require_engine "$2"
+    validate_profile "$2" "$3" 1
+    ;;
+  model)
+    [[ "${2:-}" == pull ]] || die 64 'Usage: ./dgx-model model pull <engine> <profile> [--force]'
+    (( $# == 4 || $# == 5 )) || die 64 'Usage: ./dgx-model model pull <engine> <profile> [--force]'
+    require_engine "$3"
+    force=0
+    if (( $# == 5 )); then
+      [[ "$5" == --force ]] || die 64 "Unknown model pull option: $5"
+      force=1
+    fi
+    pull_models "$3" "$4" "$force"
+    ;;
+  search)
+    query=""
+    limit=10
+    json_output=0
+    sort_field=trending_score
+    option_index=2
+    if (( $# >= 2 )) && [[ "$2" != --* ]]; then
+      query="$2"
+      option_index=3
+    fi
+    while (( option_index <= $# )); do
+      option="${!option_index}"
+      case "$option" in
+        --limit)
+          option_index=$((option_index + 1))
+          (( option_index <= $# )) || die 64 '--limit requires a value.'
+          limit="${!option_index}"
+          ;;
+        --sort)
+          option_index=$((option_index + 1))
+          (( option_index <= $# )) || die 64 '--sort requires a value.'
+          sort_field="${!option_index}"
+          ;;
+        --json) json_output=1 ;;
+        *) die 64 "Unknown search option: $option" ;;
+      esac
+      option_index=$((option_index + 1))
+    done
+    search_hf_models "$query" "$limit" "$json_output" "$sort_field"
+    ;;
+  info)
+    (( $# >= 2 && $# <= 5 )) ||
+      die 64 'Usage: ./dgx-model info <model-id> [--metadata|--text] [--json] [--raw]'
+    card_output_mode=""
+    json_output=0
+    raw_output=0
+    for option in "${@:3}"; do
+      case "$option" in
+        --metadata|--text)
+          [[ -z "$card_output_mode" ]] ||
+            die 64 'Only one of --metadata or --text may be specified.'
+          card_output_mode="$option"
+          ;;
+        --json) json_output=1 ;;
+        --raw) raw_output=1 ;;
+        *) die 64 "Unknown info option: $option" ;;
+      esac
+    done
+    show_hf_model_card "$2" "$card_output_mode" "$json_output" "$raw_output"
+    ;;
+  install)
+    (( $# >= 3 )) ||
+      die 64 'Usage: ./dgx-model install <engine> <model-id> [--profile NAME] [--gguf FILE] [--force]'
+    require_engine "$2"
+    requested_profile=""
+    gguf_file=""
+    force=0
+    option_index=4
+    while (( option_index <= $# )); do
+      option="${!option_index}"
+      case "$option" in
+        --profile)
+          option_index=$((option_index + 1))
+          (( option_index <= $# )) || die 64 '--profile requires a value.'
+          requested_profile="${!option_index}"
+          ;;
+        --gguf)
+          option_index=$((option_index + 1))
+          (( option_index <= $# )) || die 64 '--gguf requires a value.'
+          gguf_file="${!option_index}"
+          ;;
+        --force) force=1 ;;
+        *) die 64 "Unknown install option: $option" ;;
+      esac
+      option_index=$((option_index + 1))
+    done
+    install_hf_model "$2" "$3" "$requested_profile" "$gguf_file" "$force"
+    ;;
+  image)
+    (( $# == 3 )) || die 64 'Usage: ./dgx-model image <pull|build> <engine>'
+    require_engine "$3"
+    acquire_lock
+    profile="$(default_profile "$3")"
+    case "$2/$3" in
+      pull/vllm) compose_for vllm "$profile" pull ;;
+      build/llamacpp) compose_for llamacpp "$profile" build ;;
+      pull/llamacpp) die 64 'llama.cpp uses a local build. Run: ./dgx-model image build llamacpp' ;;
+      build/vllm) die 64 'vLLM uses a pinned published image. Run: ./dgx-model image pull vllm' ;;
+      *) die 64 'Usage: ./dgx-model image pull vllm | image build llamacpp' ;;
+    esac
+    ;;
+  use)
+    (( $# == 3 || $# == 4 )) || die 64 'Usage: ./dgx-model use <engine> <profile> [--recreate]'
+    require_engine "$2"
+    recreate=0
+    if (( $# == 4 )); then
+      [[ "$4" == --recreate ]] || die 64 "Unknown use option: $4"
+      recreate=1
+    fi
+    use_profile "$2" "$3" "$recreate"
+    ;;
+  status)
+    (( $# <= 2 )) || die 64 'Usage: ./dgx-model status [vllm|llamacpp]'
+    if [[ -n "${2:-}" ]]; then
+      require_engine "$2"
+      status_engine "$2"
+    else
+      status_engine vllm
+      status_engine llamacpp
+    fi
+    ;;
+  logs)
+    (( $# == 2 || $# == 3 )) || die 64 'Usage: ./dgx-model logs <engine> [--follow]'
+    require_engine "$2"
+    log_args=(--tail 200)
+    if (( $# == 3 )); then
+      [[ "$3" == --follow ]] || die 64 "Unknown logs option: $3"
+      log_args=(--follow --tail 200)
+    fi
+    docker logs "${log_args[@]}" "$(engine_container "$2")"
+    ;;
+  smoke)
+    (( $# == 2 )) || die 64 'Usage: ./dgx-model smoke <engine>'
+    require_engine "$2"
+    smoke_engine "$2"
+    ;;
+  stop)
+    (( $# <= 3 )) || die 64 'Usage: ./dgx-model stop [vllm|llamacpp] [--force]'
+    stop_engine_name=""
+    force=0
+    for option in "${@:2}"; do
+      case "$option" in
+        vllm|llamacpp)
+          [[ -z "$stop_engine_name" ]] || die 64 'Only one engine may be specified.'
+          stop_engine_name="$option"
+          ;;
+        --force) force=1 ;;
+        *) die 64 "Unknown stop option: $option" ;;
+      esac
+    done
+    acquire_lock
+    if [[ -n "$stop_engine_name" ]]; then
+      stop_engine "$stop_engine_name" "$force"
+    else
+      stop_engine vllm "$force"
+      stop_engine llamacpp "$force"
+    fi
+    ;;
+  profile)
+    [[ "${2:-}" == remove ]] || die 64 'Usage: ./dgx-model profile remove <engine> <profile> [--delete-files]'
+    (( $# == 4 || $# == 5 )) || die 64 'Usage: ./dgx-model profile remove <engine> <profile> [--delete-files]'
+    require_engine "$3"
+    delete_files=0
+    if (( $# == 5 )); then
+      [[ "$5" == --delete-files ]] || die 64 "Unknown profile remove option: $5"
+      delete_files=1
+    fi
+    remove_profile "$3" "$4" "$delete_files"
+    ;;
+  compose-config)
+    (( $# == 3 )) || die 64 'Usage: ./dgx-model compose-config <engine> <profile>'
+    require_engine "$2"
+    profile_file_for "$2" "$3" >/dev/null
+    compose_for "$2" "$3" config
+    ;;
+  -h|--help|help|'')
+    usage
+    ;;
+  *)
+    printf 'Unknown command: %s\n' "$action" >&2
+    usage >&2
+    exit 64
+    ;;
+esac

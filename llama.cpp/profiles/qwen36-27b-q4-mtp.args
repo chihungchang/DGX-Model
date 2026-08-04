@@ -1,0 +1,42 @@
+# model-url: https://huggingface.co/ggml-org/Qwen3.6-27B-GGUF/resolve/4c8d89a3b10d66695ded02bacee44f9dcf64848b/Qwen3.6-27B-Q4_K_M.gguf
+# model-sha256: 65b753ea835627f7b511143c6ceb976525c7f21f5df8c664bc0a9c23d1c49921
+# draft-model-url: https://huggingface.co/ggml-org/Qwen3.6-27B-GGUF/resolve/4c8d89a3b10d66695ded02bacee44f9dcf64848b/mtp-Qwen3.6-27B-Q4_0.gguf
+# draft-model-sha256: 3d593f9e2788d59bb30d6024706b1efd5219fea466b6397c46159e3540937173
+--model
+/models/ggml-org/Qwen3.6-27B-GGUF/Qwen3.6-27B-Q4_K_M.gguf
+--alias
+qwen3.6-27b-q4
+--host
+0.0.0.0
+--port
+8080
+--ctx-size
+262144
+--parallel
+1
+--cache-type-k
+f16
+--cache-type-v
+f16
+--n-gpu-layers
+all
+--fit
+off
+--no-mmap
+--flash-attn
+on
+--cont-batching
+--jinja
+--metrics
+--batch-size
+2048
+--ubatch-size
+1024
+--spec-type
+draft-mtp
+--spec-draft-model
+/models/ggml-org/Qwen3.6-27B-GGUF/mtp-Qwen3.6-27B-Q4_0.gguf
+--spec-draft-ngl
+all
+--spec-draft-n-max
+2

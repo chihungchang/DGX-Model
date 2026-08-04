@@ -1,0 +1,266 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "wan_animate_reference.png"
+    }
+  },
+  "2": {
+    "class_type": "LoadVideo",
+    "inputs": {
+      "file": "wan_animate_driver_384.mp4"
+    }
+  },
+  "3": {
+    "class_type": "GetVideoComponents",
+    "inputs": {
+      "video": [
+        "2",
+        0
+      ]
+    }
+  },
+  "4": {
+    "class_type": "DWPreprocessor",
+    "inputs": {
+      "image": [
+        "3",
+        0
+      ],
+      "detect_hand": "disable",
+      "detect_body": "disable",
+      "detect_face": "enable",
+      "resolution": 384,
+      "bbox_detector": "yolox_l.torchscript.pt",
+      "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
+      "scale_stick_for_xinsr_cn": "disable"
+    }
+  },
+  "5": {
+    "class_type": "DWPreprocessor",
+    "inputs": {
+      "image": [
+        "3",
+        0
+      ],
+      "detect_hand": "enable",
+      "detect_body": "enable",
+      "detect_face": "disable",
+      "resolution": 384,
+      "bbox_detector": "yolox_l.torchscript.pt",
+      "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt",
+      "scale_stick_for_xinsr_cn": "disable"
+    }
+  },
+  "6": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "cpu"
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "A cheerful pink robot character dances smoothly, full body, stable identity, consistent clothing and colors.",
+      "clip": [
+        "6",
+        0
+      ]
+    }
+  },
+  "8": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "overexposed, static, blurry, subtitles, watermark, low quality, deformed, disfigured, extra limbs, extra fingers, fused fingers, malformed hands, malformed face, inconsistent character, changing clothes, jitter, flicker",
+      "clip": [
+        "6",
+        0
+      ]
+    }
+  },
+  "9": {
+    "class_type": "CLIPVisionLoader",
+    "inputs": {
+      "clip_name": "clip_vision_h.safetensors"
+    }
+  },
+  "10": {
+    "class_type": "CLIPVisionEncode",
+    "inputs": {
+      "clip_vision": [
+        "9",
+        0
+      ],
+      "image": [
+        "1",
+        0
+      ],
+      "crop": "none"
+    }
+  },
+  "11": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "Wan2.1_VAE.pth"
+    }
+  },
+  "12": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "wan2.2_animate_14B_bf16.safetensors",
+      "weight_dtype": "fp8_e4m3fn_fast"
+    }
+  },
+  "13": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "12",
+        0
+      ],
+      "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "strength_model": 1.0
+    }
+  },
+  "14": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "13",
+        0
+      ],
+      "shift": 8.0
+    }
+  },
+  "15": {
+    "class_type": "WanAnimateToVideo",
+    "inputs": {
+      "positive": [
+        "7",
+        0
+      ],
+      "negative": [
+        "8",
+        0
+      ],
+      "vae": [
+        "11",
+        0
+      ],
+      "width": 384,
+      "height": 384,
+      "length": 33,
+      "batch_size": 1,
+      "continue_motion_max_frames": 5,
+      "video_frame_offset": 0,
+      "clip_vision_output": [
+        "10",
+        0
+      ],
+      "reference_image": [
+        "1",
+        0
+      ],
+      "face_video": [
+        "4",
+        0
+      ],
+      "pose_video": [
+        "5",
+        0
+      ]
+    }
+  },
+  "16": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "14",
+        0
+      ],
+      "seed": 739194837,
+      "steps": 6,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "15",
+        0
+      ],
+      "negative": [
+        "15",
+        1
+      ],
+      "latent_image": [
+        "15",
+        2
+      ],
+      "denoise": 1.0
+    }
+  },
+  "17": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "20",
+        0
+      ],
+      "vae": [
+        "11",
+        0
+      ]
+    }
+  },
+  "18": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "21",
+        0
+      ],
+      "fps": 16.0,
+      "bit_depth": 8
+    }
+  },
+  "19": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "18",
+        0
+      ],
+      "filename_prefix": "wan-animate/mazi-wan-animate-test",
+      "format": "mp4",
+      "codec": "h264"
+    }
+  },
+  "20": {
+    "class_type": "TrimVideoLatent",
+    "inputs": {
+      "samples": [
+        "16",
+        0
+      ],
+      "trim_amount": [
+        "15",
+        3
+      ]
+    }
+  },
+  "21": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "17",
+        0
+      ],
+      "batch_index": [
+        "15",
+        4
+      ],
+      "length": 4096
+    }
+  }
+}

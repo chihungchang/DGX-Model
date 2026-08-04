@@ -1,0 +1,37 @@
+name: dgx-vllm
+
+services:
+  vllm:
+    image: vllm/vllm-openai:nightly
+    container_name: dgx-vllm
+    entrypoint:
+      - /bin/bash
+      - /config/launch.sh
+    command:
+      - ${VLLM_PROFILE:?VLLM_PROFILE is required}
+    init: true
+    ipc: host
+    gpus: all
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8080:8080"
+    volumes:
+      - /home/chihung/models/huggingface:/models:ro
+      - ./launch.sh:/config/launch.sh:ro
+      - ./profiles:/config/profiles:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python3 -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)"
+      interval: 10s
+      timeout: 6s
+      start_period: 15m
+      retries: 6
+    stop_grace_period: 2m
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"

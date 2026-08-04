@@ -1,0 +1,33 @@
+# Mazi Live Mode audio deployment, B/candidate profile. Qwen performs an
+# incremental decode every 0.5s; transport frames may be smaller and are
+# buffered by qwen-asr. All other settings intentionally match qwen-live.args.
+meta api_name mazi-live-audio
+meta description Qwen3-ASR 1.7B 0.5s decode candidate plus Qwen3-TTS 1.7B CustomVoice
+meta llm_api_base http://127.0.0.1:8080/v1
+
+asr --asr-model-path Qwen/Qwen3-ASR-1.7B
+asr --host 0.0.0.0
+asr --port 8101
+asr --gpu-memory-utilization 0.14
+asr --max-model-len 8192
+asr --max-inference-batch-size 4
+asr --max-new-tokens 32
+asr --enforce-eager
+asr --unfixed-chunk-num 4
+asr --unfixed-token-num 5
+asr --chunk-size-sec 0.5
+asr --max-sessions 4
+asr --session-ttl-sec 120
+asr --max-chunk-bytes 131072
+asr --log-level INFO
+
+tts --model Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
+tts --host 0.0.0.0
+tts --port 8102
+tts --task-type CustomVoice
+tts --deploy-config /app/vllm-omni/vllm_omni/deploy/qwen3_tts.yaml
+tts --stage-overrides {"0":{"gpu_memory_utilization":0.08,"max_num_seqs":2,"enable_prefix_caching":false},"1":{"gpu_memory_utilization":0.06,"max_num_seqs":2}}
+tts --trust-remote-code
+tts --no-enable-log-requests
+tts --disable-uvicorn-access-log
+tts --omni

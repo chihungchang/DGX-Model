@@ -1,0 +1,191 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "s2v-reference.jpg"
+    }
+  },
+  "2": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "s2v-audio-4.8s.wav"
+    }
+  },
+  "3": {
+    "class_type": "AudioEncoderLoader",
+    "inputs": {
+      "audio_encoder_name": "wav2vec2_s2v_original.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "AudioEncoderEncode",
+    "inputs": {
+      "audio_encoder": [
+        "3",
+        0
+      ],
+      "audio": [
+        "2",
+        0
+      ]
+    }
+  },
+  "5": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "cpu"
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "A man looks down at his guitar, plays it naturally, and sings gently with synchronized mouth movement.",
+      "clip": [
+        "5",
+        0
+      ]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "overexposed, static, blurry, subtitles, watermark, low quality, deformed face, malformed hands, extra fingers, inconsistent identity, jitter, flicker, frozen mouth",
+      "clip": [
+        "5",
+        0
+      ]
+    }
+  },
+  "8": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "Wan2.1_VAE.pth"
+    }
+  },
+  "9": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "wan2.2_s2v_14B_bf16.safetensors",
+      "weight_dtype": "fp8_e4m3fn_fast"
+    }
+  },
+  "10": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "9",
+        0
+      ],
+      "lora_name": "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+      "strength_model": 1.0
+    }
+  },
+  "11": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "10",
+        0
+      ],
+      "shift": 8.0
+    }
+  },
+  "12": {
+    "class_type": "WanSoundImageToVideo",
+    "inputs": {
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ],
+      "width": 384,
+      "height": 384,
+      "length": 77,
+      "batch_size": 1,
+      "audio_encoder_output": [
+        "4",
+        0
+      ],
+      "ref_image": [
+        "1",
+        0
+      ]
+    }
+  },
+  "13": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "11",
+        0
+      ],
+      "seed": 18742196,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "uni_pc",
+      "scheduler": "simple",
+      "positive": [
+        "12",
+        0
+      ],
+      "negative": [
+        "12",
+        1
+      ],
+      "latent_image": [
+        "12",
+        2
+      ],
+      "denoise": 1.0
+    }
+  },
+  "14": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "13",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    }
+  },
+  "15": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "14",
+        0
+      ],
+      "audio": [
+        "2",
+        0
+      ],
+      "fps": 16.0,
+      "bit_depth": 8
+    }
+  },
+  "16": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "15",
+        0
+      ],
+      "filename_prefix": "wan-s2v/mazi-wan-s2v-test",
+      "format": "mp4",
+      "codec": "h264"
+    }
+  }
+}

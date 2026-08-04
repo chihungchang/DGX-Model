@@ -1,0 +1,45 @@
+name: dgx-llamacpp
+
+services:
+  llamacpp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        LLAMA_CPP_COMMIT: db7d8b24b5197ca39435cf47b3c1ba039b53605b
+    image: mazi/llama.cpp-deepseek-v4:b10214-cuda13
+    platform: linux/arm64
+    container_name: dgx-llamacpp
+    entrypoint:
+      - /bin/bash
+      - /config/launch.sh
+    command:
+      - ${LLAMA_PROFILE:?LLAMA_PROFILE is required}
+    init: true
+    ipc: host
+    gpus: all
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8080:8080"
+    volumes:
+      - /home/chihung/models/gguf:/models:ro
+      - ./launch.sh:/config/launch.sh:ro
+      - ./profiles:/config/profiles:ro
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - --show-error
+        - http://127.0.0.1:8080/health
+      interval: 10s
+      timeout: 6s
+      start_period: 10m
+      retries: 6
+    stop_grace_period: 2m
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"

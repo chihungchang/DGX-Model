@@ -1,0 +1,81 @@
+name: mazi-dgx-audio
+
+services:
+  asr:
+    platform: linux/arm64
+    image: mazi/qwen3-asr-vllm:0.0.6-vllm0.14.0-cu130
+    container_name: mazi-qwen3-asr
+    build:
+      context: .
+      dockerfile: asr/Dockerfile
+    ports:
+      - "8101:8101"
+    restart: unless-stopped
+    stop_grace_period: 45s
+    environment:
+      HF_HOME: /models/huggingface
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      PYTHONUNBUFFERED: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: spawn
+      # Triton's bundled CUDA 12.8 ptxas cannot assemble GB10 sm_121a.
+      # The pinned CUDA 13 runtime ptxas supports the DGX Spark target.
+      TRITON_PTXAS_PATH: /usr/local/cuda/bin/ptxas
+    volumes:
+      - ./profiles/${AUDIO_PROFILE:?AUDIO_PROFILE must name a profiles/*.args deployment}.args:/opt/mazi/profile.args:ro
+      - mazi-audio-hf-cache:/models/huggingface
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python3", "/opt/mazi/audio_profile_runtime.py", "health", "asr", "/opt/mazi/profile.args"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 15m
+
+  tts:
+    platform: linux/arm64
+    image: mazi/qwen3-tts-vllm-omni:0.24.0
+    container_name: mazi-qwen3-tts
+    build:
+      context: .
+      dockerfile: tts/Dockerfile
+    ports:
+      - "8102:8102"
+    restart: unless-stopped
+    stop_grace_period: 45s
+    environment:
+      HF_HOME: /models/huggingface
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      PYTHONUNBUFFERED: "1"
+      VLLM_WORKER_MULTIPROC_METHOD: spawn
+    volumes:
+      - ./profiles/${AUDIO_PROFILE:?AUDIO_PROFILE must name a profiles/*.args deployment}.args:/opt/mazi/profile.args:ro
+      - mazi-audio-hf-cache:/models/huggingface
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python3", "/opt/mazi/audio_profile_runtime.py", "health", "tts", "/opt/mazi/profile.args"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 20m
+
+volumes:
+  mazi-audio-hf-cache:
+    name: mazi-audio-hf-cache
