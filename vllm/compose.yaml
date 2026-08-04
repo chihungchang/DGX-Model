@@ -16,7 +16,7 @@ services:
     ports:
       - "0.0.0.0:8080:8080"
     volumes:
-      - /home/chihung/models/huggingface:/models:ro
+      - "${HOME:?HOME is required}/models/huggingface:/models:ro"
       - ./launch.sh:/config/launch.sh:ro
       - ./profiles:/config/profiles:ro
     healthcheck:

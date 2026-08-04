@@ -22,7 +22,7 @@ services:
     ports:
       - "0.0.0.0:8080:8080"
     volumes:
-      - /home/chihung/models/gguf:/models:ro
+      - "${HOME:?HOME is required}/models/gguf:/models:ro"
       - ./launch.sh:/config/launch.sh:ro
       - ./profiles:/config/profiles:ro
     healthcheck:

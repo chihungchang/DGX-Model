@@ -3,7 +3,7 @@
 This directory is the vLLM backend managed exclusively by
 the repository-root `dgx-model` command. It serves an OpenAI-compatible API on
 port `8080` and mounts checkpoints read-only from the host Hugging Face model
-directory configured by Compose.
+directory at `$HOME/models/huggingface`.
 
 The container image is pinned by digest in `compose.yaml`. Profiles under
 `profiles/*.args` are the only source of model-specific vLLM arguments.

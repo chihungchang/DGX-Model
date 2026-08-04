@@ -112,9 +112,12 @@ engine_profile_env() {
 }
 
 engine_model_root() {
+  local home_dir
+  home_dir="${HOME:?HOME is required}"
+
   case "$1" in
-    vllm) printf '/home/chihung/models/huggingface\n' ;;
-    llamacpp) printf '/home/chihung/models/gguf\n' ;;
+    vllm) printf '%s/models/huggingface\n' "$home_dir" ;;
+    llamacpp) printf '%s/models/gguf\n' "$home_dir" ;;
   esac
 }
 

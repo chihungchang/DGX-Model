@@ -10,8 +10,8 @@ truth.
 
 | Path | Purpose | Persistent/runtime data |
 | --- | --- | --- |
-| `llama.cpp/` | GGUF LLM runtime and profile manager | External host GGUF model directory |
-| `vllm/` | vLLM OpenAI-compatible server and profile manager | External host Hugging Face model directory |
+| `llama.cpp/` | GGUF LLM runtime and profile manager | `$HOME/models/gguf` |
+| `vllm/` | vLLM OpenAI-compatible server and profile manager | `$HOME/models/huggingface` |
 
 The workspace root is tracked in the `chihungchang/DGX-Model` Git repository
 and contains no `AGENTS.md`.

@@ -79,9 +79,10 @@ period for in-flight requests.
 
 ## Model downloads
 
-For vLLM, model paths such as `/models/nvidia/Qwen3.6-27B-NVFP4` map beneath
-the host Hugging Face model directory configured by the manager. `model pull`
-uses the host `hf` CLI and downloads the complete repository snapshot,
+For vLLM, model paths such as `/models/nvidia/Qwen3.6-27B-NVFP4` map beneath the
+host Hugging Face model directory at `$HOME/models/huggingface`. The
+`model pull` command uses the host `hf` CLI and downloads the complete repository
+snapshot,
 including any drafter referenced by `--speculative-config`. Optional pinned
 revisions use:
 
