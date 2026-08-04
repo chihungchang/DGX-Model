@@ -12,6 +12,38 @@ memory. `use` validates the target profile, image, and every model artifact
 before it gracefully stops the other engine and starts the selected one. Both
 engines use the same fixed host/API port, `8080`.
 
+## Repository overview
+
+| Backend | Host model storage | Canonical configuration |
+| --- | --- | --- |
+| vLLM | `$HOME/models/huggingface` | `vllm/compose.yaml` and direct `vllm/profiles/*.args` files |
+| llama.cpp | `$HOME/models/gguf` | `llama.cpp/Dockerfile`, `llama.cpp/compose.yaml`, and direct `llama.cpp/profiles/*.args` files |
+
+Backup files and directories are ignored and must not be used as configuration
+sources. Runtime state is deliberately not recorded in this document because it
+becomes stale; use `./dgx-model status` for the current engine, profile, and
+health.
+
+### Included vLLM profiles
+
+| Profile | Purpose |
+| --- | --- |
+| `qwen` | Qwen3.6 27B NVFP4 with MTP=2 |
+| `qwen-mtp2-cosvc` | Qwen3.6 27B co-residency baseline |
+| `qwen-dflash` | Qwen3.6 27B NVFP4 with DFlash |
+| `qwen35` | Qwen3.6 35B A3B NVFP4 with FP8 KV and MTP=3 |
+| `qwen35-q4kv` | Qwen3.6 35B A3B NVFP4 with INT4 KV and MTP=2 |
+
+### Included llama.cpp profiles
+
+| Profile | Purpose |
+| --- | --- |
+| `qwen36-27b-q4-mtp-c4` | Qwen3.6 27B Q4_K_M with external MTP and four parallel slots |
+| `qwen36-27b-q4-mtp` | Qwen3.6 27B Q4_K_M with external MTP |
+| `qwen36-27b-q4` | Qwen3.6 27B Q4_K_M without speculative decoding |
+| `qwen36-fable-q4-mtp` | Fable Fusion with embedded MTP and multimodal projector |
+| `qwythos` | Qwythos 9B with embedded MTP |
+
 ## Common workflow
 
 ```bash
@@ -82,9 +114,8 @@ period for in-flight requests.
 For vLLM, model paths such as `/models/nvidia/Qwen3.6-27B-NVFP4` map beneath the
 host Hugging Face model directory at `$HOME/models/huggingface`. The
 `model pull` command uses the host `hf` CLI and downloads the complete repository
-snapshot,
-including any drafter referenced by `--speculative-config`. Optional pinned
-revisions use:
+snapshot, including any drafter referenced by `--speculative-config`. Optional
+pinned revisions use:
 
 ```text
 # hf-revision: /models/organization/repository COMMIT_SHA
