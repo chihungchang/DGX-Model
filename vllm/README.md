@@ -44,5 +44,6 @@ its drafter is downloaded at the tested commit rather than an unpinned branch.
 directory before executing `vllm serve`.
 
 Historical benchmarks and inactive tuning candidates remain under
-`benchmarks/`, `backups/`, and `profiles/tuning-20260720/`; they are not treated
-as deployable profiles.
+`benchmarks/` and `profiles/tuning-20260720/`; they are not treated as
+deployable profiles. Backup files and directories are ignored and must never be
+used as runtime configuration sources.

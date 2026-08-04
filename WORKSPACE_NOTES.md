@@ -72,8 +72,9 @@ At inspection time:
   - `qwen36-27b-q4`: 262,144 context, no speculative draft
   - `qwen36-fable-q4-mtp`: 262,144 context, embedded MTP + mmproj; active
   - `qwythos`: 131,072 context, embedded MTP
-- Historical backups are retained in `.backup-*` directories and
-  `*.b10214-backup` files.
+- Only `llama.cpp/Dockerfile`, `llama.cpp/compose.yaml`, and
+  `llama.cpp/profiles/*.args` are configuration sources. Backup paths are
+  ignored and must not be used as sources.
 
 ### vLLM
 
@@ -81,15 +82,16 @@ At inspection time:
 - Shared deployment: `vllm/compose.yaml`
 - Safe argument-array entrypoint: `vllm/launch.sh`
 - Image is pinned by digest.
-- Current non-backup profiles:
+- Current profiles:
   - `qwen`: Qwen3.6 27B NVFP4, MTP=2, 262,144 context, GPU utilization 0.65
   - `qwen-mtp2-cosvc`: co-residency baseline, effectively similar to `qwen`
   - `qwen-dflash`: Qwen3.6 27B NVFP4 + DFlash, GPU utilization 0.4
   - `qwen35`: Qwen3.6 35B A3B NVFP4, FP8 KV, FlashInfer, MTP=3
   - `qwen35-q4kv`: same 35B checkpoint, INT4 KV, Triton attention, MTP=2
 - Benchmark/tuning notes are under `vllm/benchmarks/` and
-  `vllm/profiles/tuning-20260720/`; prior configurations are under
-  `vllm/backups/` and `*.bak` files.
+  `vllm/profiles/tuning-20260720/`. Only `vllm/compose.yaml` and direct
+  `vllm/profiles/*.args` files are deployable configuration sources; backups
+  are ignored.
 
 ### ComfyUI
 

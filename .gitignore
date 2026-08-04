@@ -18,5 +18,17 @@ __pycache__/
 .vscode/
 *~
 
+# Backups are local safety copies, never authoritative repository sources
+**/.backup*/
+**/backup/
+**/backups/
+*.bak
+*.backup
+*.old
+*.orig
+*-bak
+*-backup
+*.codex-baseline-*
+
 # ComfyUI runtime data, downloaded models, custom nodes, inputs, and outputs
 /comfyui/data/
