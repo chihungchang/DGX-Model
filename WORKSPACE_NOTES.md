@@ -88,10 +88,9 @@ At inspection time:
   - `qwen-dflash`: Qwen3.6 27B NVFP4 + DFlash, GPU utilization 0.4
   - `qwen35`: Qwen3.6 35B A3B NVFP4, FP8 KV, FlashInfer, MTP=3
   - `qwen35-q4kv`: same 35B checkpoint, INT4 KV, Triton attention, MTP=2
-- Benchmark/tuning notes are under `vllm/benchmarks/` and
-  `vllm/profiles/tuning-20260720/`. Only `vllm/compose.yaml` and direct
-  `vllm/profiles/*.args` files are deployable configuration sources; backups
-  are ignored.
+- Only `vllm/compose.yaml` and direct `vllm/profiles/*.args` files are
+  deployable configuration sources. Historical tuning candidates are not kept
+  in the workspace, and backups are ignored.
 
 ### ComfyUI
 

@@ -43,7 +43,7 @@ its drafter is downloaded at the tested commit rather than an unpinned branch.
 `launch.sh` revalidates the main model and every explicit/speculative model
 directory before executing `vllm serve`.
 
-Historical benchmarks and inactive tuning candidates remain under
-`benchmarks/` and `profiles/tuning-20260720/`; they are not treated as
-deployable profiles. Backup files and directories are ignored and must never be
-used as runtime configuration sources.
+Only `compose.yaml` and direct `profiles/*.args` files are deployable
+configuration sources. Historical tuning candidates are not kept in the
+workspace; backup files and directories are ignored and must never be used as
+runtime configuration sources.
