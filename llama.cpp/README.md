@@ -41,7 +41,7 @@ handling. GGUF files are mounted read-only from `$HOME/models/gguf`.
 
 The `ds4` deployment is about 115 GB: a 103 GB target model across four pinned
 GGUF shards plus a pinned 10.9 GB DSpark draft sidecar. It uses a 256K context,
-Q8_0 KV cache, and five-token DSpark speculative blocks on a
+Q8_0 KV cache, and three-token DSpark speculative blocks on a
 single 128 GB DGX Spark. Think High is the model default; OpenAI-compatible
 clients can request `reasoning_effort=max` or disable thinking for individual
 requests.

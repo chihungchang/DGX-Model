@@ -32,7 +32,7 @@ all
 --spec-type
 draft-dspark
 --spec-draft-n-max
-5
+3
 --spec-draft-ngl
 all
 --fit
