@@ -123,6 +123,7 @@ health.
 
 | Profile | Purpose |
 | --- | --- |
+| `ds4` | DeepSeek V4 Flash 0731 UD-IQ3_XXS with 128K context |
 | `qwen36-27b-q4-mtp-c4` | Qwen3.6 27B Q4_K_M with external MTP and four parallel slots |
 | `qwen36-27b-q4-mtp` | Qwen3.6 27B Q4_K_M with external MTP |
 | `qwen36-27b-q4` | Qwen3.6 27B Q4_K_M without speculative decoding |
@@ -135,6 +136,7 @@ health.
 # Discover and inspect profiles without changing runtime state.
 ./dgx-model list
 ./dgx-model show vllm qwen-dflash
+./dgx-model show llamacpp ds4
 ./dgx-model show llamacpp qwen36-fable-q4-mtp
 ./dgx-model validate llamacpp qwen36-fable-q4-mtp
 
@@ -144,6 +146,7 @@ health.
 
 # Download every model artifact required by a profile.
 ./dgx-model model pull vllm qwen-dflash
+./dgx-model model pull llamacpp ds4
 ./dgx-model model pull llamacpp qwen36-fable-q4-mtp
 
 # Discover a Hugging Face model, generate a default profile from its model
@@ -155,6 +158,7 @@ health.
 
 # Activate one engine. The other main engine is stopped automatically.
 ./dgx-model use vllm qwen-dflash
+./dgx-model use llamacpp ds4
 ./dgx-model use llamacpp qwen36-fable-q4-mtp
 
 # Observe and test without changing the selected model.

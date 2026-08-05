@@ -1,8 +1,8 @@
-# Pin the validated llama.cpp release so CUDA, multimodal, and speculative
+# Pin the validated llama.cpp commit so CUDA, multimodal, and speculative
 # decoding behavior remain reproducible across model profiles.
 FROM nvidia/cuda:13.0.0-devel-ubuntu24.04
 
-ARG LLAMA_CPP_COMMIT=1464c62d88f699ec9700c8010bbfdbc603a9efd6
+ARG LLAMA_CPP_COMMIT=6ea215d171fd31df943bf1ac8227129f2b963160
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \

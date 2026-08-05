@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        LLAMA_CPP_COMMIT: 1464c62d88f699ec9700c8010bbfdbc603a9efd6
-    image: mazi/llama.cpp:b10236-cuda13-openssl
+        LLAMA_CPP_COMMIT: 6ea215d171fd31df943bf1ac8227129f2b963160
+    image: mazi/llama.cpp-deepseek-v4:0731
     platform: linux/arm64
     container_name: dgx-llamacpp
     entrypoint:

@@ -4,14 +4,17 @@ This directory is the llama.cpp backend managed exclusively by
 the repository-root `dgx-model` command. It serves an OpenAI-compatible API,
 web UI, health endpoint, and Prometheus metrics on port `8080`.
 
-The local CUDA image is `mazi/llama.cpp:b10236-cuda13-openssl`, built from
-llama.cpp commit `1464c62d88f699ec9700c8010bbfdbc603a9efd6`. GGUF files are
-mounted read-only from `$HOME/models/gguf`.
+The local CUDA image is
+`mazi/llama.cpp-deepseek-v4:0731`, built from llama.cpp commit
+`6ea215d171fd31df943bf1ac8227129f2b963160`. This build includes the dedicated
+Flash 0731 chat template, reasoning-effort mapping, and structured-output
+handling. GGUF files are mounted read-only from `$HOME/models/gguf`.
 
 ## Installed profiles
 
 | Profile | Context | Speculation / purpose |
 | --- | ---: | --- |
+| `ds4` | 131,072 | DeepSeek V4 Flash 0731 UD-IQ3_XXS, full CUDA offload |
 | `qwen36-27b-q4` | 262,144 | Qwen3.6 27B Q4_K_M baseline |
 | `qwen36-27b-q4-mtp` | 262,144 | External MTP draft, two tokens |
 | `qwen36-27b-q4-mtp-c4` | 1,048,576 | External MTP draft, four parallel slots |
@@ -22,8 +25,12 @@ mounted read-only from `$HOME/models/gguf`.
 
 ```bash
 ./dgx-model list llamacpp
+./dgx-model show llamacpp ds4
 ./dgx-model show llamacpp qwen36-fable-q4-mtp
 ./dgx-model image build llamacpp
+./dgx-model model pull llamacpp ds4
+./dgx-model validate llamacpp ds4
+./dgx-model use llamacpp ds4
 ./dgx-model model pull llamacpp qwen36-fable-q4-mtp
 ./dgx-model validate llamacpp qwen36-fable-q4-mtp
 ./dgx-model use llamacpp qwen36-fable-q4-mtp
@@ -31,6 +38,11 @@ mounted read-only from `$HOME/models/gguf`.
 ./dgx-model logs llamacpp --follow
 ./dgx-model stop llamacpp
 ```
+
+The `ds4` model is about 103 GB across four pinned GGUF shards. Its 128K
+context leaves operating headroom on a single 128 GB DGX Spark. Think High is
+the model default; OpenAI-compatible clients can request
+`reasoning_effort=max` or disable thinking for individual requests.
 
 `model pull` downloads and verifies every file referenced by the profile,
 including the main GGUF, external MTP draft, and mmproj. Downloads use `.part`
