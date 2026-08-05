@@ -14,7 +14,7 @@ handling. GGUF files are mounted read-only from `$HOME/models/gguf`.
 
 | Profile | Context | Speculation / purpose |
 | --- | ---: | --- |
-| `ds4` | 131,072 | DeepSeek V4 Flash 0731 UD-IQ3_XXS, full CUDA offload |
+| `ds4` | 262,144 | DeepSeek V4 Flash 0731 UD-IQ3_XXS with DSpark, full CUDA offload |
 | `qwen36-27b-q4` | 262,144 | Qwen3.6 27B Q4_K_M baseline |
 | `qwen36-27b-q4-mtp` | 262,144 | External MTP draft, two tokens |
 | `qwen36-27b-q4-mtp-c4` | 1,048,576 | External MTP draft, four parallel slots |
@@ -39,10 +39,12 @@ handling. GGUF files are mounted read-only from `$HOME/models/gguf`.
 ./dgx-model stop llamacpp
 ```
 
-The `ds4` model is about 103 GB across four pinned GGUF shards. Its 128K
-context leaves operating headroom on a single 128 GB DGX Spark. Think High is
-the model default; OpenAI-compatible clients can request
-`reasoning_effort=max` or disable thinking for individual requests.
+The `ds4` deployment is about 115 GB: a 103 GB target model across four pinned
+GGUF shards plus a pinned 10.9 GB DSpark draft sidecar. It uses a 256K context,
+Q8_0 KV cache, and five-token DSpark speculative blocks on a
+single 128 GB DGX Spark. Think High is the model default; OpenAI-compatible
+clients can request `reasoning_effort=max` or disable thinking for individual
+requests.
 
 `model pull` downloads and verifies every file referenced by the profile,
 including the main GGUF, external MTP draft, and mmproj. Downloads use `.part`

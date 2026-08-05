@@ -123,7 +123,7 @@ health.
 
 | Profile | Purpose |
 | --- | --- |
-| `ds4` | DeepSeek V4 Flash 0731 UD-IQ3_XXS with 128K context |
+| `ds4` | DeepSeek V4 Flash 0731 UD-IQ3_XXS with DSpark and 256K context |
 | `qwen36-27b-q4-mtp-c4` | Qwen3.6 27B Q4_K_M with external MTP and four parallel slots |
 | `qwen36-27b-q4-mtp` | Qwen3.6 27B Q4_K_M with external MTP |
 | `qwen36-27b-q4` | Qwen3.6 27B Q4_K_M without speculative decoding |
