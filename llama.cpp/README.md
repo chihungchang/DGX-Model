@@ -5,10 +5,10 @@ the repository-root `dgx-model` command. It serves an OpenAI-compatible API,
 web UI, health endpoint, and Prometheus metrics on port `8080`.
 
 The local CUDA image is
-`mazi/llama.cpp-deepseek-v4:0731`, built from llama.cpp commit
-`6ea215d171fd31df943bf1ac8227129f2b963160`. This build includes the dedicated
-Flash 0731 chat template, reasoning-effort mapping, and structured-output
-handling. GGUF files are mounted read-only from `$HOME/models/gguf`.
+`mazi/llama.cpp-qwen38-flash-next:b10715-mtp`, built from Unsloth's pinned
+`b10715-mix-86bd2d3` ARM64 CUDA 13 release. This build supports the Qwen4Exp
+architecture used by Qwen3.8 Flash Next, including lazy PLE loading and its
+shared MTP sidecar. GGUF files are mounted read-only from `$HOME/models/gguf`.
 
 ## Installed profiles
 
@@ -19,6 +19,7 @@ handling. GGUF files are mounted read-only from `$HOME/models/gguf`.
 | `qwen36-27b-q4-mtp` | 262,144 | External MTP draft, two tokens |
 | `qwen36-27b-q4-mtp-c4` | 1,048,576 | External MTP draft, four parallel slots |
 | `qwen36-fable-q4-mtp` | 262,144 | Fable Fusion embedded MTP plus multimodal projector |
+| `qwen38-flash-next-q4` | 262,144 | Qwen3.8 Flash Next UD-IQ4_XS with Q8 MTP=3, lazy PLE, and multimodal projector |
 | `qwythos` | 131,072 | Qwythos 9B embedded MTP |
 
 ## Commands
@@ -32,8 +33,11 @@ handling. GGUF files are mounted read-only from `$HOME/models/gguf`.
 ./dgx-model validate llamacpp ds4
 ./dgx-model use llamacpp ds4
 ./dgx-model model pull llamacpp qwen36-fable-q4-mtp
+./dgx-model model pull llamacpp qwen38-flash-next-q4
 ./dgx-model validate llamacpp qwen36-fable-q4-mtp
+./dgx-model validate llamacpp qwen38-flash-next-q4
 ./dgx-model use llamacpp qwen36-fable-q4-mtp
+./dgx-model use llamacpp qwen38-flash-next-q4
 ./dgx-model smoke llamacpp
 ./dgx-model logs llamacpp --follow
 ./dgx-model stop llamacpp

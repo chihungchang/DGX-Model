@@ -1,0 +1,54 @@
+name: dgx-sglang
+
+services:
+  sglang:
+    image: ${SGLANG_IMAGE:-dgx-sglang:qwen38-dflash2-mrope-v1}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SGLANG_BASE_IMAGE: ${SGLANG_BASE_IMAGE:-lmsysorg/sglang@sha256:616a3e97f45191af975896cfa644279096cb31bd408a071c2e99ca7209c3cafe}
+    pull_policy: never
+    platform: linux/arm64
+    container_name: dgx-sglang
+    entrypoint:
+      - /bin/bash
+      - /config/launch.sh
+    command:
+      - ${SGLANG_PROFILE:?SGLANG_PROFILE is required}
+    init: true
+    ipc: host
+    gpus: all
+    cpuset: 5-9,15-19
+    restart: unless-stopped
+    environment:
+      SGLANG_CACHE_DIR: /cache/sglang
+      TORCHINDUCTOR_CACHE_DIR: /cache/inductor
+      TRITON_CACHE_DIR: /cache/triton
+    ports:
+      - "0.0.0.0:8080:8080"
+    volumes:
+      - "${HOME:?HOME is required}/models/huggingface:/models:ro"
+      - ./launch.sh:/config/launch.sh:ro
+      - ./profiles:/config/profiles:ro
+      - sglang-cache:/cache
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python3 -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8080/v1/models', timeout=5)"
+      interval: 10s
+      timeout: 6s
+      start_period: 30m
+      retries: 6
+    stop_grace_period: 2m
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+
+volumes:
+  sglang-cache:
+    name: dgx-sglang-cache

@@ -9,7 +9,7 @@ markdown_renderer="$script_dir/scripts/dgx_model_markdown.py"
 usage() {
   cat <<'EOF'
 Usage:
-  ./dgx-model list [vllm|llamacpp]
+  ./dgx-model list [vllm|sglang|llamacpp]
       List profiles, complete model availability, and runtime state.
 
   ./dgx-model show <engine> <profile>
@@ -30,16 +30,16 @@ Usage:
   ./dgx-model install <engine> <model-id> [--profile NAME] [--gguf FILE] [--force]
       Read the model card, create a pinned default profile, and download it.
 
-  ./dgx-model image pull vllm
-      Pull the pinned vLLM container image.
+  ./dgx-model image pull vllm [profile]
+      Pull the pinned published vLLM image for a profile (or the default).
 
-  ./dgx-model image build llamacpp
-      Build the pinned local llama.cpp CUDA image.
+  ./dgx-model image build <sglang|llamacpp> [profile]
+      Build the pinned local SGLang derivative or llama.cpp CUDA image.
 
   ./dgx-model use <engine> <profile> [--recreate]
-      Activate a validated profile. The other main engine is stopped first.
+      Activate a validated profile. The other main engines are stopped first.
 
-  ./dgx-model status [vllm|llamacpp]
+  ./dgx-model status [vllm|sglang|llamacpp]
       Show the actual Docker state and active profile recovered from Docker.
 
   ./dgx-model logs <engine> [--follow]
@@ -48,8 +48,8 @@ Usage:
   ./dgx-model smoke <engine>
       Send a small OpenAI-compatible chat request to the active engine.
 
-  ./dgx-model stop [vllm|llamacpp] [--force]
-      Gracefully stop one or both engines; --force uses a zero-second timeout.
+  ./dgx-model stop [vllm|sglang|llamacpp] [--force]
+      Gracefully stop one or all engines; --force uses a zero-second timeout.
 
   ./dgx-model profile remove <engine> <profile> [--delete-files]
       Remove a profile. Model data is retained unless --delete-files is given.
@@ -59,6 +59,7 @@ Usage:
 
 Engines:
   vllm       Hugging Face checkpoints served on port 8080.
+  sglang     Hugging Face checkpoints served by SGLang on port 8080.
   llamacpp   GGUF models served by llama.cpp on port 8080.
 EOF
 }
@@ -78,14 +79,15 @@ require_command() {
 
 require_engine() {
   case "${1:-}" in
-    vllm|llamacpp) ;;
-    *) die 64 "Unknown engine: ${1:-<empty>}. Expected vllm or llamacpp." ;;
+    vllm|sglang|llamacpp) ;;
+    *) die 64 "Unknown engine: ${1:-<empty>}. Expected vllm, sglang, or llamacpp." ;;
   esac
 }
 
 engine_dir() {
   case "$1" in
     vllm) printf '%s/vllm\n' "$script_dir" ;;
+    sglang) printf '%s/sglang\n' "$script_dir" ;;
     llamacpp) printf '%s/llama.cpp\n' "$script_dir" ;;
   esac
 }
@@ -93,6 +95,7 @@ engine_dir() {
 engine_container() {
   case "$1" in
     vllm) printf 'dgx-vllm\n' ;;
+    sglang) printf 'dgx-sglang\n' ;;
     llamacpp) printf 'dgx-llamacpp\n' ;;
   esac
 }
@@ -100,6 +103,7 @@ engine_container() {
 engine_port() {
   case "$1" in
     vllm) printf '8080\n' ;;
+    sglang) printf '8080\n' ;;
     llamacpp) printf '8080\n' ;;
   esac
 }
@@ -107,6 +111,7 @@ engine_port() {
 engine_profile_env() {
   case "$1" in
     vllm) printf 'VLLM_PROFILE\n' ;;
+    sglang) printf 'SGLANG_PROFILE\n' ;;
     llamacpp) printf 'LLAMA_PROFILE\n' ;;
   esac
 }
@@ -116,16 +121,18 @@ engine_model_root() {
   home_dir="${HOME:?HOME is required}"
 
   case "$1" in
-    vllm) printf '%s/models/huggingface\n' "$home_dir" ;;
+    vllm|sglang) printf '%s/models/huggingface\n' "$home_dir" ;;
     llamacpp) printf '%s/models/gguf\n' "$home_dir" ;;
   esac
 }
 
-other_engine() {
-  case "$1" in
-    vllm) printf 'llamacpp\n' ;;
-    llamacpp) printf 'vllm\n' ;;
-  esac
+other_engines() {
+  local selected="$1"
+  local engine
+
+  for engine in vllm sglang llamacpp; do
+    [[ "$engine" == "$selected" ]] || printf '%s\n' "$engine"
+  done
 }
 
 profile_file_for() {
@@ -260,6 +267,19 @@ profile_artifacts() {
         fi
       fi
       ;;
+    sglang)
+      main_path="$(arg_value --model-path "$profile_file" || true)"
+      [[ -n "$main_path" ]] || main_path="$(arg_value --model "$profile_file" || true)"
+      emit_artifact hf "$main_path" "${main_path#/models/}" \
+        "$(hf_revision_for "$main_path" "$profile_file")"
+
+      draft_path="$(arg_value --speculative-draft-model-path "$profile_file" || true)"
+      [[ -n "$draft_path" ]] || draft_path="$(arg_value --speculative-draft-model "$profile_file" || true)"
+      if [[ -n "$draft_path" ]]; then
+        emit_artifact hf "$draft_path" "${draft_path#/models/}" \
+          "$(hf_revision_for "$draft_path" "$profile_file")"
+      fi
+      ;;
     llamacpp)
       main_path="$(arg_value --model "$profile_file" || true)"
       model_url="$(metadata_value model-url "$profile_file")"
@@ -291,9 +311,9 @@ container_to_host() {
 
   root="$(engine_model_root "$engine")"
   case "$engine" in
-    vllm)
+    vllm|sglang)
       if [[ ! "$container_path" =~ ^/models/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
-        printf 'Unsafe vLLM model path in %s: %s\n' "$source" "$container_path" >&2
+        printf 'Unsafe Hugging Face model path in %s: %s\n' "$source" "$container_path" >&2
         return 64
       fi
       ;;
@@ -324,7 +344,7 @@ artifact_ready() {
   local engine="$1"
   local host_path="$2"
   case "$engine" in
-    vllm) [[ -d "$host_path" && -r "$host_path/config.json" ]] ;;
+    vllm|sglang) [[ -d "$host_path" && -r "$host_path/config.json" ]] ;;
     llamacpp) [[ -f "$host_path" && -r "$host_path" ]] ;;
   esac
 }
@@ -362,12 +382,47 @@ compose_for() {
   local engine="$1"
   local profile="$2"
   shift 2
-  local directory compose_file profile_env
+  local directory compose_file profile_env profile_file image_override
+  local -a environment
 
   directory="$(engine_dir "$engine")"
   compose_file="$directory/compose.yaml"
   profile_env="$(engine_profile_env "$engine")"
-  env "$profile_env=$profile" docker compose \
+  environment=("$profile_env=$profile")
+  if [[ "$engine" == vllm ]]; then
+    # Keep ambient shell state from overriding the repository's pinned image.
+    environment+=("VLLM_IMAGE=")
+    profile_file="$directory/profiles/${profile}.args"
+    if [[ -r "$profile_file" ]]; then
+      image_override="$(metadata_value vllm-image "$profile_file")"
+      if [[ -n "$image_override" ]]; then
+        [[ "$image_override" =~ ^vllm/vllm-openai@sha256:[0-9a-f]{64}$ ]] ||
+          die 64 "Invalid pinned vLLM image in $profile_file: $image_override"
+        environment[${#environment[@]}-1]="VLLM_IMAGE=$image_override"
+      fi
+    fi
+  elif [[ "$engine" == sglang ]]; then
+    # A profile may pin a distinct local derivative and its immutable parent.
+    # This lets DSpark reproduce its published runtime without removing the
+    # newer image needed by the DFlash2 profile.
+    environment+=("SGLANG_IMAGE=" "SGLANG_BASE_IMAGE=")
+    profile_file="$directory/profiles/${profile}.args"
+    if [[ -r "$profile_file" ]]; then
+      image_override="$(metadata_value sglang-image "$profile_file")"
+      if [[ -n "$image_override" ]]; then
+        [[ "$image_override" =~ ^dgx-sglang:[a-z0-9][a-z0-9._-]*$ ]] ||
+          die 64 "Invalid pinned SGLang image in $profile_file: $image_override"
+        environment[${#environment[@]}-2]="SGLANG_IMAGE=$image_override"
+      fi
+      image_override="$(metadata_value sglang-base-image "$profile_file")"
+      if [[ -n "$image_override" ]]; then
+        [[ "$image_override" =~ ^lmsysorg/sglang@sha256:[0-9a-f]{64}$ ]] ||
+          die 64 "Invalid pinned SGLang base image in $profile_file: $image_override"
+        environment[${#environment[@]}-1]="SGLANG_BASE_IMAGE=$image_override"
+      fi
+    fi
+  fi
+  env "${environment[@]}" docker compose \
     --project-directory "$directory" \
     -f "$compose_file" \
     "$@"
@@ -388,7 +443,8 @@ require_configured_image() {
   [[ -n "$image" ]] || die 66 "Compose did not resolve an image for $engine."
   if ! docker image inspect "$image" >/dev/null 2>&1; then
     case "$engine" in
-      vllm) die 66 "Container image is missing. Run: ./dgx-model image pull vllm" ;;
+      vllm) die 66 "Container image is missing. Run: ./dgx-model image pull vllm $profile" ;;
+      sglang) die 66 "Container image is missing. Run: ./dgx-model image build sglang $profile" ;;
       llamacpp) die 66 "Container image is missing. Run: ./dgx-model image build llamacpp" ;;
     esac
   fi
@@ -442,7 +498,7 @@ acquire_lock() {
 list_profiles() {
   local filter="${1:-}"
   local engine directory profile_file profile api_name context artifacts runtime active_profile marker model
-  local -a engines=(vllm llamacpp)
+  local -a engines=(vllm sglang llamacpp)
 
   if [[ -n "$filter" ]]; then
     require_engine "$filter"
@@ -464,6 +520,11 @@ list_profiles() {
         model="$(first_profile_arg "$profile_file")"
         api_name="$(arg_value --served-model-name "$profile_file" || true)"
         context="$(arg_value --max-model-len "$profile_file" || true)"
+      elif [[ "$engine" == sglang ]]; then
+        model="$(arg_value --model-path "$profile_file" || true)"
+        [[ -n "$model" ]] || model="$(arg_value --model "$profile_file" || true)"
+        api_name="$(arg_value --served-model-name "$profile_file" || true)"
+        context="$(arg_value --context-length "$profile_file" || true)"
       else
         model="$(arg_value --model "$profile_file" || true)"
         api_name="$(arg_value --alias "$profile_file" || true)"
@@ -671,7 +732,7 @@ pull_models() {
   records="$(profile_artifacts "$engine" "$profile_file")"
 
   case "$engine" in
-    vllm)
+    vllm|sglang)
       require_command hf
       while IFS=$'\t' read -r kind container_path source checksum; do
         [[ -n "$container_path" ]] || continue
@@ -743,7 +804,7 @@ search_hf_models() {
     def has_file($pattern): filenames | any(test($pattern; "i"));
     def supports_llamacpp:
       has_tag("(^|:)gguf$") or has_file("[.]gguf$");
-    def supports_vllm:
+    def supports_hf_server:
       (
         has_tag("^vllm$") or
         (has_file("(^|/)config[.]json$") and has_file("[.](safetensors|bin)$"))
@@ -753,7 +814,8 @@ search_hf_models() {
     map(
       . + {
         supported_engines: [
-          if supports_vllm then "vllm" else empty end,
+          if supports_hf_server then "vllm" else empty end,
+          if supports_hf_server then "sglang" else empty end,
           if supports_llamacpp then "llamacpp" else empty end
         ]
       } |
@@ -872,13 +934,13 @@ install_hf_model() {
   fi
 
   case "$engine" in
-    vllm)
-      host_path="$(container_to_host vllm "/models/$model_id" "$model_id")"
+    vllm|sglang)
+      host_path="$(container_to_host "$engine" "/models/$model_id" "$model_id")"
       printf 'Downloading pinned Hugging Face snapshot %s@%s\n' "$model_id" "$revision"
       hf_args=(download "$model_id" --revision "$revision" --local-dir "$host_path")
       (( force == 1 )) && hf_args+=(--force-download)
       hf "${hf_args[@]}"
-      artifact_ready vllm "$host_path" ||
+      artifact_ready "$engine" "$host_path" ||
         die 66 "Downloaded model is missing config.json: $host_path"
       ;;
     llamacpp)
@@ -922,7 +984,7 @@ wait_until_healthy() {
 
   container="$(engine_container "$engine")"
   port="$(engine_port "$engine")"
-  deadline=$((SECONDS + 900))
+  deadline=$((SECONDS + 1800))
 
   while (( SECONDS < deadline )); do
     status="$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)"
@@ -964,7 +1026,7 @@ wait_until_healthy() {
     sleep 5
   done
 
-  printf 'Timed out waiting 900 seconds for %s health.\n' "$engine" >&2
+  printf 'Timed out waiting 1800 seconds for %s health.\n' "$engine" >&2
   docker logs --tail 160 "$container" >&2 || true
   return 1
 }
@@ -993,15 +1055,16 @@ use_profile() {
 
   acquire_lock
   validate_profile "$engine" "$profile" 1
-  other="$(other_engine "$engine")"
 
   current_profile="$(container_profile "$engine")"
   runtime="$(container_runtime_state "$engine")"
-  if container_uses_memory "$other"; then
-    printf 'Stopping active %s engine before switching to %s/%s.\n' \
-      "$other" "$engine" "$profile"
-    stop_engine "$other" 0
-  fi
+  while IFS= read -r other; do
+    if container_uses_memory "$other"; then
+      printf 'Stopping active %s engine before switching to %s/%s.\n' \
+        "$other" "$engine" "$profile"
+      stop_engine "$other" 0
+    fi
+  done < <(other_engines "$engine")
 
   if [[ "$current_profile" == "$profile" && "$runtime" == running/healthy && "$recreate" != 1 ]]; then
     printf '%s/%s is already running and healthy. Use --recreate to replace it.\n' \
@@ -1032,7 +1095,7 @@ status_engine() {
 
 smoke_engine() {
   local engine="$1"
-  local profile profile_file model port payload response
+  local profile profile_file model port payload response reasoning_parser
   require_command jq
   profile="$(container_profile "$engine")"
   [[ -n "$profile" ]] || die 69 "No $engine container is active."
@@ -1041,16 +1104,32 @@ smoke_engine() {
   profile_file="$(profile_file_for "$engine" "$profile")"
   case "$engine" in
     vllm) model="$(arg_value --served-model-name "$profile_file")" ;;
+    sglang) model="$(arg_value --served-model-name "$profile_file")" ;;
     llamacpp) model="$(arg_value --alias "$profile_file")" ;;
   esac
   port="$(engine_port "$engine")"
-  payload="$(jq -nc --arg model "$model" '{
-    model: $model,
-    messages: [{role: "user", content: "Reply exactly with: DGX MODEL OK"}],
-    chat_template_kwargs: {enable_thinking: false},
-    temperature: 0,
-    max_tokens: 32
-  }')"
+  reasoning_parser="$(arg_value --reasoning-parser "$profile_file" || true)"
+  if [[ "$reasoning_parser" == muse_glimmer ]]; then
+    payload="$(jq -nc --arg model "$model" '{
+      model: $model,
+      messages: [
+        {role: "system", content: "Reasoning strength: low"},
+        {role: "user", content: "Reply exactly with: DGX MODEL OK"}
+      ],
+      temperature: 1.0,
+      top_p: 0.95,
+      top_k: 64,
+      max_tokens: 128
+    }')"
+  else
+    payload="$(jq -nc --arg model "$model" '{
+      model: $model,
+      messages: [{role: "user", content: "Reply exactly with: DGX MODEL OK"}],
+      chat_template_kwargs: {enable_thinking: false},
+      temperature: 0,
+      max_tokens: 32
+    }')"
+  fi
   response="$(curl --fail --silent --show-error \
     "http://127.0.0.1:${port}/v1/chat/completions" \
     -H 'Content-Type: application/json' \
@@ -1066,7 +1145,7 @@ model_data_key() {
   local host_path="$2"
   local directory basename total_shards
 
-  if [[ "$engine" == vllm ]]; then
+  if [[ "$engine" == vllm || "$engine" == sglang ]]; then
     printf '%s\n' "$host_path"
     return
   fi
@@ -1087,35 +1166,43 @@ artifact_shared_by() {
   local engine="$1"
   local target_profile_file="$2"
   local target_key="$3"
-  local directory other_file other_profile records kind container_path source checksum host_path key
+  local scan_engine directory other_file other_profile records kind container_path source checksum host_path key
   local shared=""
+  local -a scan_engines
 
-  directory="$(engine_dir "$engine")"
-  while IFS= read -r other_file; do
-    [[ "$other_file" == "$target_profile_file" ]] && continue
-    other_profile="${other_file##*/}"
-    other_profile="${other_profile%.args}"
-    records="$(profile_artifacts "$engine" "$other_file")"
-    while IFS=$'\t' read -r kind container_path source checksum; do
-      [[ -n "$container_path" ]] || continue
-      host_path="$(container_to_host "$engine" "$container_path" "$other_file")"
-      key="$(model_data_key "$engine" "$host_path")"
-      if [[ "$key" == "$target_key" ]]; then
-        shared="${shared:+${shared}, }${other_profile}"
-      fi
-    done <<< "$records"
-  done < <(find "$directory/profiles" -maxdepth 1 -type f -name '*.args' -print | sort)
+  if [[ "$engine" == vllm || "$engine" == sglang ]]; then
+    scan_engines=(vllm sglang)
+  else
+    scan_engines=(llamacpp)
+  fi
+  for scan_engine in "${scan_engines[@]}"; do
+    directory="$(engine_dir "$scan_engine")"
+    while IFS= read -r other_file; do
+      [[ "$other_file" == "$target_profile_file" ]] && continue
+      other_profile="${other_file##*/}"
+      other_profile="${other_profile%.args}"
+      records="$(profile_artifacts "$scan_engine" "$other_file")"
+      while IFS=$'\t' read -r kind container_path source checksum; do
+        [[ -n "$container_path" ]] || continue
+        host_path="$(container_to_host "$scan_engine" "$container_path" "$other_file")"
+        key="$(model_data_key "$scan_engine" "$host_path")"
+        if [[ "$key" == "$target_key" ]]; then
+          shared="${shared:+${shared}, }${scan_engine}/${other_profile}"
+        fi
+      done <<< "$records"
+    done < <(find "$directory/profiles" -maxdepth 1 -type f -name '*.args' -print | sort)
+  done
   printf '%s\n' "$shared"
 }
 
-delete_vllm_data() {
+delete_hf_data() {
   local host_path="$1"
   if [[ -L "$host_path" ]]; then
     rm -- "$host_path"
   elif [[ -d "$host_path" ]]; then
     rm -rf --one-file-system -- "$host_path"
   elif [[ -e "$host_path" ]]; then
-    die 64 "Refusing to remove non-directory vLLM model path: $host_path"
+    die 64 "Refusing to remove non-directory Hugging Face model path: $host_path"
   else
     printf 'Model data already absent: %s\n' "$host_path"
     return
@@ -1196,8 +1283,8 @@ remove_profile() {
   for ((i = 0; i < ${#paths[@]}; i++)); do
     if [[ -n "${shared_by[i]}" ]]; then
       printf 'Model data retained (used by %s): %s\n' "${shared_by[i]}" "${paths[i]}"
-    elif [[ "$engine" == vllm ]]; then
-      delete_vllm_data "${paths[i]}"
+    elif [[ "$engine" == vllm || "$engine" == sglang ]]; then
+      delete_hf_data "${paths[i]}"
     else
       delete_llama_data "${paths[i]}"
     fi
@@ -1207,7 +1294,7 @@ remove_profile() {
 action="${1:-}"
 case "$action" in
   list)
-    (( $# <= 2 )) || die 64 'Usage: ./dgx-model list [vllm|llamacpp]'
+    (( $# <= 2 )) || die 64 'Usage: ./dgx-model list [vllm|sglang|llamacpp]'
     list_profiles "${2:-}"
     ;;
   show)
@@ -1310,16 +1397,27 @@ case "$action" in
     install_hf_model "$2" "$3" "$requested_profile" "$gguf_file" "$force"
     ;;
   image)
-    (( $# == 3 )) || die 64 'Usage: ./dgx-model image <pull|build> <engine>'
+    (( $# == 3 || $# == 4 )) ||
+      die 64 'Usage: ./dgx-model image pull vllm [profile] | image build <sglang|llamacpp> [profile]'
     require_engine "$3"
     acquire_lock
-    profile="$(default_profile "$3")"
+    if (( $# == 4 )); then
+      profile="$4"
+      profile_file_for "$3" "$profile" >/dev/null
+    elif [[ "$3" == vllm || "$3" == sglang ]]; then
+      # No profile means the default image pinned directly in Compose.
+      profile=image-default
+    else
+      profile="$(default_profile "$3")"
+    fi
     case "$2/$3" in
       pull/vllm) compose_for vllm "$profile" pull ;;
+      build/sglang) compose_for sglang "$profile" build --pull ;;
       build/llamacpp) compose_for llamacpp "$profile" build ;;
       pull/llamacpp) die 64 'llama.cpp uses a local build. Run: ./dgx-model image build llamacpp' ;;
+      pull/sglang) die 64 'SGLang uses a pinned local derivative. Run: ./dgx-model image build sglang' ;;
       build/vllm) die 64 'vLLM uses a pinned published image. Run: ./dgx-model image pull vllm' ;;
-      *) die 64 'Usage: ./dgx-model image pull vllm | image build llamacpp' ;;
+      *) die 64 'Usage: ./dgx-model image pull vllm [profile] | image build <sglang|llamacpp> [profile]' ;;
     esac
     ;;
   use)
@@ -1333,12 +1431,13 @@ case "$action" in
     use_profile "$2" "$3" "$recreate"
     ;;
   status)
-    (( $# <= 2 )) || die 64 'Usage: ./dgx-model status [vllm|llamacpp]'
+    (( $# <= 2 )) || die 64 'Usage: ./dgx-model status [vllm|sglang|llamacpp]'
     if [[ -n "${2:-}" ]]; then
       require_engine "$2"
       status_engine "$2"
     else
       status_engine vllm
+      status_engine sglang
       status_engine llamacpp
     fi
     ;;
@@ -1358,12 +1457,12 @@ case "$action" in
     smoke_engine "$2"
     ;;
   stop)
-    (( $# <= 3 )) || die 64 'Usage: ./dgx-model stop [vllm|llamacpp] [--force]'
+    (( $# <= 3 )) || die 64 'Usage: ./dgx-model stop [vllm|sglang|llamacpp] [--force]'
     stop_engine_name=""
     force=0
     for option in "${@:2}"; do
       case "$option" in
-        vllm|llamacpp)
+        vllm|sglang|llamacpp)
           [[ -z "$stop_engine_name" ]] || die 64 'Only one engine may be specified.'
           stop_engine_name="$option"
           ;;
@@ -1376,6 +1475,7 @@ case "$action" in
       stop_engine "$stop_engine_name" "$force"
     else
       stop_engine vllm "$force"
+      stop_engine sglang "$force"
       stop_engine llamacpp "$force"
     fi
     ;;

@@ -1,0 +1,45 @@
+name: dgx-sglang-dflash2-tp2
+services:
+  sglang:
+    image: dgx-sglang:qwen38-dflash2-mmcache-20260914
+    pull_policy: never
+    platform: linux/arm64
+    container_name: dgx-sglang-dflash2-tp2
+    entrypoint: [/bin/bash, /config/launch.sh]
+    command: ["qwen-dflash2-tp2-node${SPARK_NODE_RANK:?Set SPARK_NODE_RANK to 0 or 1}"]
+    init: true
+    ipc: host
+    network_mode: host
+    gpus: all
+    cpuset: 5-9,15-19
+    restart: unless-stopped
+    devices:
+      - /dev/infiniband/rdma_cm
+      - /dev/infiniband/uverbs0
+      - /dev/infiniband/uverbs1
+      - /dev/infiniband/uverbs2
+      - /dev/infiniband/uverbs3
+    ulimits:
+      memlock: {soft: -1, hard: -1}
+    environment:
+      SGLANG_CACHE_DIR: /cache/sglang
+      TORCHINDUCTOR_CACHE_DIR: /cache/inductor
+      TRITON_CACHE_DIR: /cache/triton
+      NCCL_SOCKET_IFNAME: enp1s0f0np0
+      GLOO_SOCKET_IFNAME: enp1s0f0np0
+      NCCL_IB_HCA: rocep1s0f0,roceP2p1s0f0
+      NCCL_NET: IB
+      NCCL_DEBUG: INFO
+      SGLANG_ENABLE_TP_MEMORY_INBALANCE_CHECK: "0"
+    volumes:
+      - /home/chihung/models/huggingface:/models:ro
+      - ./launch.sh:/config/launch.sh:ro
+      - ./profiles:/config/profiles:ro
+      - sglang-dflash2-tp2-cache:/cache
+    stop_grace_period: 2m
+    logging:
+      driver: json-file
+      options: {max-size: 20m, max-file: "3"}
+volumes:
+  sglang-dflash2-tp2-cache:
+    name: dgx-sglang-dflash2-tp2-cache

@@ -61,6 +61,57 @@ VLLM_INTEGER_FLAGS = {
     "--max-num-seqs",
 }
 
+SGLANG_VALUE_FLAGS = {
+    "--attention-backend",
+    "--chunked-prefill-size",
+    "--context-length",
+    "--cuda-graph-max-bs",
+    "--decode-attention-backend",
+    "--default-chat-template-kwargs",
+    "--dtype",
+    "--json-model-override-args",
+    "--kv-cache-dtype",
+    "--load-format",
+    "--max-prefill-tokens",
+    "--max-running-requests",
+    "--max-total-tokens",
+    "--mem-fraction-static",
+    "--model-impl",
+    "--model-loader-extra-config",
+    "--moe-runner-backend",
+    "--page-size",
+    "--prefill-attention-backend",
+    "--quantization",
+    "--reasoning-parser",
+    "--schedule-policy",
+    "--tokenizer-mode",
+    "--tool-call-parser",
+    "--watchdog-timeout",
+}
+SGLANG_BOOL_FLAGS = {
+    "--disable-cuda-graph",
+    "--disable-overlap-schedule",
+    "--disable-piecewise-cuda-graph",
+    "--disable-radix-cache",
+    "--enable-multimodal",
+    "--enable-torch-compile",
+    "--skip-server-warmup",
+    "--trust-remote-code",
+}
+SGLANG_JSON_FLAGS = {
+    "--default-chat-template-kwargs",
+    "--json-model-override-args",
+    "--model-loader-extra-config",
+}
+SGLANG_INTEGER_FLAGS = {
+    "--context-length",
+    "--cuda-graph-max-bs",
+    "--max-prefill-tokens",
+    "--max-running-requests",
+    "--max-total-tokens",
+    "--page-size",
+}
+
 LLAMA_VALUE_FLAGS = {
     "--batch-size",
     "--cache-type-k",
@@ -227,6 +278,83 @@ def extract_vllm_card_args(card: str) -> tuple[list[str], str]:
     return result, command
 
 
+def normalize_sglang_json_flag(flag: str, value: str) -> str | None:
+    if flag not in SGLANG_JSON_FLAGS:
+        return value
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return None
+    return json.dumps(parsed, separators=(",", ":"), ensure_ascii=False)
+
+
+def extract_sglang_card_args(card: str) -> tuple[list[str], str]:
+    marker = re.compile(
+        r"(?:^|\s)(?:(?:python|python3)\s+-m\s+sglang[.]launch_server|sglang\s+serve)(?:\s|$)"
+    )
+    candidates = candidate_commands(card, marker)
+    if not candidates:
+        return [], ""
+    _, command, tokens = candidates[0]
+    try:
+        module_index = tokens.index("sglang.launch_server")
+    except ValueError:
+        try:
+            serve_index = next(
+                i
+                for i, token in enumerate(tokens[:-1])
+                if token == "sglang" and tokens[i + 1] == "serve"
+            )
+        except StopIteration:
+            return [], ""
+        i = serve_index + 2
+    else:
+        i = module_index + 1
+
+    result: list[str] = []
+    seen: set[str] = set()
+    while i < len(tokens):
+        token = tokens[i]
+        if "=" in token and token.startswith("--"):
+            flag, value = token.split("=", 1)
+            step = 1
+        else:
+            flag = token
+            value = tokens[i + 1] if i + 1 < len(tokens) else ""
+            step = 2
+
+        if flag in SGLANG_BOOL_FLAGS:
+            if flag not in seen:
+                result.append(flag)
+                seen.add(flag)
+            i += 1
+            continue
+        if flag not in SGLANG_VALUE_FLAGS or not value or value.startswith("--"):
+            i += 1
+            continue
+        if flag in SGLANG_INTEGER_FLAGS and not re.fullmatch(r"[1-9][0-9]*", value):
+            i += step
+            continue
+        if flag == "--chunked-prefill-size" and not re.fullmatch(r"(?:-1|[1-9][0-9]*)", value):
+            i += step
+            continue
+        if flag == "--mem-fraction-static":
+            try:
+                utilization = float(value)
+            except ValueError:
+                i += step
+                continue
+            if not 0 < utilization < 1:
+                i += step
+                continue
+        normalized = normalize_sglang_json_flag(flag, value)
+        if normalized is not None and flag not in seen:
+            result.extend((flag, normalized))
+            seen.add(flag)
+        i += step
+    return result, command
+
+
 def context_from_card(card: str) -> int | None:
     patterns = (
         r"(?:default|native|maximum|max(?:imum)?)[^\n]{0,50}context(?:\s+window|\s+length)?[^\d\n]{0,20}([0-9][0-9,]{3,})",
@@ -284,6 +412,104 @@ def vllm_plan(
     ]
     return {
         "engine": "vllm",
+        "model_id": model_id,
+        "revision": revision,
+        "profile": safe_profile_name(model_id),
+        "card_command": card_command,
+        "artifacts": [
+            {
+                "kind": "hf",
+                "filename": "",
+                "container_path": f"/models/{model_id}",
+            }
+        ],
+        "args": args,
+    }
+
+
+def sglang_quantization(info: dict[str, Any] | None) -> str:
+    config = (info or {}).get("config")
+    if not isinstance(config, dict):
+        return ""
+    quantization = config.get("quantization_config")
+    if not isinstance(quantization, dict):
+        return ""
+    algorithm = str(quantization.get("quant_algo", "")).upper()
+    method = str(quantization.get("quant_method", "")).lower()
+    if algorithm == "MIXED_PRECISION":
+        return "modelopt_mixed"
+    config_groups = quantization.get("config_groups")
+    bit_widths: set[int] = set()
+    if isinstance(config_groups, dict):
+        for group in config_groups.values():
+            if isinstance(group, dict) and isinstance(
+                (weights := group.get("weights")), dict
+            ):
+                num_bits = weights.get("num_bits")
+                if isinstance(num_bits, int):
+                    bit_widths.add(num_bits)
+    if method == "modelopt" and 4 in bit_widths and 8 in bit_widths:
+        return "modelopt_mixed"
+    if method == "modelopt" and 4 in bit_widths:
+        return "modelopt_fp4"
+    if method == "modelopt" and 8 in bit_widths:
+        return "modelopt_fp8"
+    if method == "modelopt" and "NVFP4" in algorithm:
+        return "modelopt_fp4"
+    if method == "modelopt" and algorithm == "FP8":
+        return "modelopt_fp8"
+    return ""
+
+
+def sglang_plan(
+    model_id: str,
+    revision: str,
+    card: str,
+    info: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    tags = {tag.lower() for tag in ((info or {}).get("tags") or []) if isinstance(tag, str)}
+    unsupported_formats = tags.intersection({"gguf", "mlx", "onnx", "coreml", "tflite"})
+    if unsupported_formats:
+        fail(
+            f"{model_id} is tagged as {', '.join(sorted(unsupported_formats))}, "
+            "not as an SGLang checkpoint. Use the matching engine or repository."
+        )
+    pipeline_tag = (info or {}).get("pipeline_tag")
+    supported_tasks = {"text-generation", "image-text-to-text", "text2text-generation"}
+    if isinstance(pipeline_tag, str) and pipeline_tag not in supported_tasks:
+        fail(
+            f"{model_id} uses the {pipeline_tag} task, which this SGLang deployment "
+            "manager does not support."
+        )
+
+    card_args, card_command = extract_sglang_card_args(card)
+    flags = {item for item in card_args if item.startswith("--")}
+    if "--context-length" not in flags:
+        context = context_from_card(card)
+        if context:
+            card_args.extend(("--context-length", str(context)))
+    if "--quantization" not in flags:
+        quantization = sglang_quantization(info)
+        if quantization:
+            card_args.extend(("--quantization", quantization))
+    if "--mem-fraction-static" not in flags:
+        card_args.extend(("--mem-fraction-static", "0.8"))
+
+    args = [
+        "--model-path",
+        f"/models/{model_id}",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8080",
+        "--served-model-name",
+        safe_alias(model_id),
+        "--tp-size",
+        "1",
+        *card_args,
+    ]
+    return {
+        "engine": "sglang",
         "model_id": model_id,
         "revision": revision,
         "profile": safe_profile_name(model_id),
@@ -513,6 +739,8 @@ def make_plan(args: argparse.Namespace) -> None:
         card = ""
     if args.engine == "vllm":
         plan = vllm_plan(args.model_id, revision, card, info)
+    elif args.engine == "sglang":
+        plan = sglang_plan(args.model_id, revision, card, info)
     else:
         plan = llama_plan(args.model_id, revision, card, info, args.gguf)
     json.dump(plan, sys.stdout, ensure_ascii=False, indent=2)
@@ -541,7 +769,7 @@ def render_profile(args: argparse.Namespace) -> None:
         fail("Plan contains an unsafe model ID.")
     if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-fA-F]{40,64}", revision):
         fail("Plan contains an invalid revision.")
-    if engine not in {"vllm", "llamacpp"} or not isinstance(artifacts, list) or not isinstance(profile_args, list):
+    if engine not in {"vllm", "sglang", "llamacpp"} or not isinstance(artifacts, list) or not isinstance(profile_args, list):
         fail("Plan has an invalid structure.")
 
     lines = [
@@ -556,7 +784,7 @@ def render_profile(args: argparse.Namespace) -> None:
     else:
         lines.append("# Model card command: none found; conservative DGX Spark defaults were used.")
 
-    if engine == "vllm":
+    if engine in {"vllm", "sglang"}:
         lines.append(f"# hf-revision: /models/{model_id} {revision}")
     else:
         for artifact in artifacts:
@@ -593,7 +821,7 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser()
     subparsers = root.add_subparsers(dest="command", required=True)
     plan = subparsers.add_parser("plan")
-    plan.add_argument("--engine", choices=("vllm", "llamacpp"), required=True)
+    plan.add_argument("--engine", choices=("vllm", "sglang", "llamacpp"), required=True)
     plan.add_argument("--model-id", required=True)
     plan.add_argument("--info", required=True)
     plan.add_argument("--card", required=True)

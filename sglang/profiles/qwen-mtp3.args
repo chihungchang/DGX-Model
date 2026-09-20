@@ -1,0 +1,41 @@
+# Qwen3.8 27B mixed NVFP4/FP8 with the in-checkpoint three-token MTP head.
+# In SGLang, three MTP steps plus the target verification position produce a
+# four-token draft tree, hence num-steps=3 and num-draft-tokens=4.
+# hf-model: RadixArk/Qwen3.8-27B-NVFP4
+# hf-revision-id: 319f741cce68d7914884900c138a1fbb70a42f30
+# hf-revision: /models/RadixArk/Qwen3.8-27B-NVFP4 319f741cce68d7914884900c138a1fbb70a42f30
+--model-path
+/models/RadixArk/Qwen3.8-27B-NVFP4
+--host
+0.0.0.0
+--port
+8080
+--served-model-name
+qwen3.8-27b
+--tp-size
+1
+--context-length
+262144
+--kv-cache-dtype
+fp8_e4m3
+--attention-backend
+flashinfer
+--chunked-prefill-size
+2048
+--mem-fraction-static
+0.80
+--max-running-requests
+1
+--reasoning-parser
+qwen3
+--tool-call-parser
+qwen3_coder
+--trust-remote-code
+--speculative-algorithm
+EAGLE
+--speculative-num-steps
+3
+--speculative-eagle-topk
+1
+--speculative-num-draft-tokens
+4

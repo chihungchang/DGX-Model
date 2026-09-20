@@ -1,0 +1,55 @@
+# Qwen3.8 Flash Next using Unsloth's compact 4-bit quantization.
+# Lazy mmap keeps the large PLE table on disk and reads only requested rows.
+# hf-model: unsloth/Qwen3.8-Flash-Next-GGUF
+# hf-revision-id: 38bb39ee97821de2c9009abb7e93950eec396e66
+# model-url: https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf
+# model-sha256: 5ce89370720f8bf90890f439361282104c1aa1482d4013bb9a50923e758e71a4
+# artifact: gguf /models/unsloth/Qwen3.8-Flash-Next-GGUF/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf 577a38a2392b40ca2193cea502e1d92f60b8cd370675d308e0ec21885d9daaa7
+# artifact: gguf /models/unsloth/Qwen3.8-Flash-Next-GGUF/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00003-of-00003.gguf https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00003-of-00003.gguf d4634e6d84f0ebb0940be15c90d3790bf6464e3dea3a1cddc567dc0e83ad8833
+# draft-model-url: https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/MTP/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf
+# draft-model-sha256: 5ff54097406a905cf3a724c709124ceb0e3e10235ee862298969e91c96fa96e6
+# mmproj-url: https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/mmproj-F16.gguf
+# mmproj-sha256: 1f7b7f0b984cf065c604360c29c8098362ed61b290db0ff12c6f360bb1a8a980
+--model
+/models/unsloth/Qwen3.8-Flash-Next-GGUF/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf
+--mmproj
+/models/unsloth/Qwen3.8-Flash-Next-GGUF/mmproj-F16.gguf
+--alias
+qwen3.8-flash-next-q4
+--host
+0.0.0.0
+--port
+8080
+--ctx-size
+524288
+--parallel
+2
+--cache-type-k
+q8_0
+--cache-type-v
+q8_0
+--n-gpu-layers
+all
+--spec-draft-model
+/models/unsloth/Qwen3.8-Flash-Next-GGUF/MTP/mtp-Qwen3.8-Flash-Next-shared-Q8_0.gguf
+--spec-type
+draft-mtp
+--spec-draft-n-max
+3
+--spec-draft-ngl
+all
+--fit
+off
+--load-mode
+mmap
+--lazy-mode
+on
+--flash-attn
+on
+--cont-batching
+--jinja
+--metrics
+--batch-size
+2048
+--ubatch-size
+512

@@ -1,15 +1,15 @@
 # DGX model management
 
-`dgx-model` is the only management command for the main vLLM and llama.cpp
-engines on this DGX Spark. Run it from the repository root:
+`dgx-model` is the only management command for the main vLLM, SGLang, and
+llama.cpp engines on this DGX Spark. Run it from the repository root:
 
 ```bash
 ./dgx-model --help
 ```
 
-The two main engines are mutually exclusive because they share DGX unified
+The three main engines are mutually exclusive because they share DGX unified
 memory. `use` validates the target profile, image, and every model artifact
-before it gracefully stops the other engine and starts the selected one. Both
+before it gracefully stops the other engines and starts the selected one. All
 engines use the same fixed host/API port, `8080`.
 
 ## Prerequisites
@@ -102,6 +102,7 @@ While an engine is healthy, its OpenAI-compatible API is available at
 | Backend | Host model storage | Canonical configuration |
 | --- | --- | --- |
 | vLLM | `$HOME/models/huggingface` | `vllm/compose.yaml` and direct `vllm/profiles/*.args` files |
+| SGLang | `$HOME/models/huggingface` | `sglang/compose.yaml` and direct `sglang/profiles/*.args` files |
 | llama.cpp | `$HOME/models/gguf` | `llama.cpp/Dockerfile`, `llama.cpp/compose.yaml`, and direct `llama.cpp/profiles/*.args` files |
 
 Backup files and directories are ignored and must not be used as configuration
@@ -113,11 +114,29 @@ health.
 
 | Profile | Purpose |
 | --- | --- |
+| `muse-glimmer` | Meta Muse Glimmer 30B BF16 with 128K context and agentic parsers |
+| `muse-glimmer-dflash` | Muse Glimmer BF16 with its official DFlash drafter, verified on DGX Spark |
 | `qwen` | Qwen3.6 27B NVFP4 with MTP=2 |
 | `qwen-mtp2-cosvc` | Qwen3.6 27B co-residency baseline |
 | `qwen-dflash` | Qwen3.6 27B NVFP4 with DFlash |
 | `qwen35` | Qwen3.6 35B A3B NVFP4 with FP8 KV and MTP=3 |
 | `qwen35-q4kv` | Qwen3.6 35B A3B NVFP4 with INT4 KV and MTP=2 |
+
+### Included SGLang profiles
+
+| Profile | Purpose |
+| --- | --- |
+| `qwen` | Qwen3.8 27B mixed NVFP4/FP8 with FP8 KV cache and 256K context |
+| `qwen-mtp3` | Qwen3.8 27B NVFP4 with the embedded three-token MTP head |
+| `qwen-dspark` | Qwen3.8 27B NVFP4 with the pinned block-7 DSpark draft |
+| `qwen-dflash2` | Qwen3.8 27B NVFP4 with pinned DFlash2 draft; concurrency capped at one for correctness |
+
+The backend builds locally patched derivatives of pinned SGLang images. The
+DSpark profile uses the exact image manifest from its published 36.6 tok/s
+benchmark, while DFlash2 retains its newer development image. Both derivatives
+route multidimensional image/video mRoPE through the correct native
+implementation; text requests retain the fused path. See
+[`sglang/BENCHMARKS.md`](sglang/BENCHMARKS.md) for the current on-device result.
 
 ### Included llama.cpp profiles
 
@@ -128,6 +147,7 @@ health.
 | `qwen36-27b-q4-mtp` | Qwen3.6 27B Q4_K_M with external MTP |
 | `qwen36-27b-q4` | Qwen3.6 27B Q4_K_M without speculative decoding |
 | `qwen36-fable-q4-mtp` | Fable Fusion with embedded MTP and multimodal projector |
+| `qwen38-flash-next-q4` | Qwen3.8 Flash Next UD-IQ4_XS with Q8 MTP=3, lazy PLE, and multimodal projector |
 | `qwythos` | Qwythos 9B with embedded MTP |
 
 ## Usage
@@ -136,16 +156,23 @@ health.
 # Discover and inspect profiles without changing runtime state.
 ./dgx-model list
 ./dgx-model show vllm qwen-dflash
+./dgx-model show sglang qwen
+./dgx-model show sglang qwen-dspark
+./dgx-model show sglang qwen-dflash2
 ./dgx-model show llamacpp ds4
 ./dgx-model show llamacpp qwen36-fable-q4-mtp
 ./dgx-model validate llamacpp qwen36-fable-q4-mtp
 
 # Prepare container images explicitly.
 ./dgx-model image pull vllm
+./dgx-model image pull vllm muse-glimmer
+./dgx-model image build sglang
 ./dgx-model image build llamacpp
 
 # Download every model artifact required by a profile.
 ./dgx-model model pull vllm qwen-dflash
+./dgx-model model pull sglang qwen-dflash2
+./dgx-model model pull sglang qwen-dspark
 ./dgx-model model pull llamacpp ds4
 ./dgx-model model pull llamacpp qwen36-fable-q4-mtp
 
@@ -153,11 +180,14 @@ health.
 # card, pin the current revision, and download it automatically.
 ./dgx-model search "Qwen3.5 9B"
 ./dgx-model install vllm Qwen/Qwen3.5-9B
+./dgx-model install sglang Qwen/Qwen3.5-9B
 ./dgx-model search "Qwen3.5 GGUF"
 ./dgx-model install llamacpp <org>/<repo>-GGUF
 
-# Activate one engine. The other main engine is stopped automatically.
+# Activate one engine. The other main engines are stopped automatically.
 ./dgx-model use vllm qwen-dflash
+./dgx-model use sglang qwen-dflash2
+./dgx-model use sglang qwen-dspark
 ./dgx-model use llamacpp ds4
 ./dgx-model use llamacpp qwen36-fable-q4-mtp
 
@@ -167,7 +197,7 @@ health.
 ./dgx-model logs llamacpp --follow
 ./dgx-model smoke llamacpp
 
-# Graceful stop is the default. With no engine, stop both main engines.
+# Graceful stop is the default. With no engine, stop all main engines.
 ./dgx-model stop llamacpp
 ./dgx-model stop
 ```
@@ -188,23 +218,24 @@ period for in-flight requests.
 | `search [query] ...` | Search Hugging Face by popularity and show all locally supported engines for every result |
 | `info <model-id> ...` | Preview the Hugging Face model card, or print metadata, text, JSON, or raw Markdown |
 | `install <engine> <model-id> ...` | Inspect the model card, create a revision-pinned default profile, and automatically download every selected artifact |
-| `image pull vllm` | Pull the immutable vLLM image pinned by Compose digest |
+| `image pull vllm [profile]` | Pull the immutable published image pinned by digest |
+| `image build sglang [profile]` | Build the local DFlash2 and mRoPE-correctness derivative from SGLang's pinned ARM64 image |
 | `image build llamacpp` | Build the pinned local CUDA llama.cpp image |
 | `use <engine> <profile>` | Safely switch the active main engine and wait for `/v1/models` |
 | `status [engine]` | Read the profile and health directly from Docker; no state file is used |
 | `logs <engine> [--follow]` | Print 200 lines once, or continue streaming with `--follow` |
 | `smoke <engine>` | Send and validate a small OpenAI-compatible chat completion |
-| `stop [engine] [--force]` | Gracefully stop one or both engines; force is explicit |
+| `stop [engine] [--force]` | Gracefully stop one or all engines; force is explicit |
 | `profile remove ...` | Remove a profile; model files are retained by default |
 | `compose-config ...` | Print raw rendered Compose configuration for debugging |
 
 ## Model downloads
 
-For vLLM, model paths such as `/models/nvidia/Qwen3.6-27B-NVFP4` map beneath the
-host Hugging Face model directory at `$HOME/models/huggingface`. The
-`model pull` command uses the host `hf` CLI and downloads the complete repository
-snapshot, including any drafter referenced by `--speculative-config`. Optional
-pinned revisions use:
+For vLLM and SGLang, model paths such as
+`/models/RadixArk/Qwen3.8-27B-NVFP4` map beneath the shared host Hugging Face model
+directory at `$HOME/models/huggingface`. The `model pull` command uses the host
+`hf` CLI and downloads the complete repository snapshot, including any
+configured speculative drafter. Optional pinned revisions use:
 
 ```text
 # hf-revision: /models/organization/repository COMMIT_SHA
@@ -219,10 +250,11 @@ replacement when an existing file is incorrect.
 
 Search results default to `--sort trending_score`. Available sort fields are
 `downloads`, `likes`, `trending_score`, `last_modified`, and `created_at`.
-Each result reports `vllm`, `llamacpp`, both engines, or `-` when this manager
-cannot safely derive a deployment. Detection uses repository tags plus the
-actual `config.json`, Safetensors/PyTorch, and GGUF files. `--limit N` accepts
-1–100 results, and `--json` adds a `supported_engines` array for scripting:
+Each result reports any supported combination of `vllm`, `sglang`, and
+`llamacpp`, or `-` when this manager cannot safely derive a deployment.
+Detection uses repository tags plus the actual `config.json`,
+Safetensors/PyTorch, and GGUF files. `--limit N` accepts 1–100 results, and
+`--json` adds a `supported_engines` array for scripting:
 
 Human-readable results use a multi-line block per model so long repository IDs
 cannot shift or merge the metadata fields.
@@ -254,17 +286,18 @@ explicitly selects the same body-only view, while `--raw` prints the complete
 original Markdown including its YAML frontmatter. Metadata and JSON modes
 remain machine-readable and are not styled.
 
-`install` reads repository metadata and the model card without executing
-any card content. For vLLM it imports supported options from the card's
-standard `vllm serve` example, then applies this host's fixed address, port,
-and single-GPU topology. For llama.cpp it imports supported `llama-server`
-options and selects the card's recommended GGUF quantization. If none is
-stated, `Q4_K_M` is preferred. Sharded GGUFs and an available multimodal
-projector are downloaded as a complete set.
+`install` reads repository metadata and the model card without executing any
+card content. For vLLM and SGLang it imports an allowlisted subset of options
+from the respective server example, then applies this host's fixed address,
+port, and single-GPU topology. For llama.cpp it imports supported
+`llama-server` options and selects the card's recommended GGUF quantization. If
+none is stated, `Q4_K_M` is preferred. Sharded GGUFs and an available
+multimodal projector are downloaded as a complete set.
 
 ```bash
 # The default profile name is derived from the repository name.
 ./dgx-model install vllm Qwen/Qwen3.5-9B
+./dgx-model install sglang Qwen/Qwen3.5-9B
 
 # Override the profile name or GGUF selection when needed.
 ./dgx-model install vllm Qwen/Qwen3.5-9B --profile qwen35-9b
@@ -282,6 +315,7 @@ profiles also use the `hf` CLI, so authenticated downloads continue to work.
 
 ```bash
 ./dgx-model profile remove vllm <profile>
+./dgx-model profile remove sglang <profile>
 ./dgx-model profile remove llamacpp <profile>
 ./dgx-model profile remove llamacpp <profile> --delete-files
 ```
@@ -300,6 +334,9 @@ must be stopped before removal.
 - `vllm/compose.yaml`: shared vLLM container configuration
 - `vllm/profiles/*.args`: vLLM model and serving arguments
 - `vllm/launch.sh`: small container-side vLLM entrypoint and artifact preflight
+- `sglang/compose.yaml`: pinned NVIDIA SGLang container configuration
+- `sglang/profiles/*.args`: SGLang model and serving arguments
+- `sglang/launch.sh`: small container-side SGLang entrypoint and artifact preflight
 - `llama.cpp/compose.yaml`: shared llama.cpp container/build configuration
 - `llama.cpp/profiles/*.args`: llama.cpp arguments and download metadata
 - `llama.cpp/launch.sh`: small container-side llama.cpp entrypoint and artifact preflight

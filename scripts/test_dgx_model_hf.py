@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -25,6 +26,56 @@ RENDERER_SPEC.loader.exec_module(markdown_renderer)
 
 
 class HuggingFaceProfileTests(unittest.TestCase):
+    def test_vllm_profile_can_select_a_pinned_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fake_docker = Path(directory, "docker")
+            fake_docker.write_text(
+                "#!/usr/bin/env bash\nprintf '%s\\n' \"${VLLM_IMAGE-}\"\n",
+                encoding="utf-8",
+            )
+            fake_docker.chmod(0o755)
+            environment = os.environ.copy()
+            environment["PATH"] = f"{directory}:{environment['PATH']}"
+            environment["VLLM_IMAGE"] = "untrusted/ambient:latest"
+            repository = HELPER_PATH.parent.parent
+            manager = Path(directory, "dgx-model")
+            shutil.copy2(repository / "dgx-model", manager)
+            profiles = Path(directory, "vllm", "profiles")
+            profiles.mkdir(parents=True)
+            shutil.copy2(repository / "vllm" / "compose.yaml", profiles.parent)
+            pinned_image = "vllm/vllm-openai@sha256:" + "a" * 64
+            (profiles / "muse-glimmer.args").write_text(
+                f"# vllm-image: {pinned_image}\n--model\n/models/test\n",
+                encoding="utf-8",
+            )
+            (profiles / "qwen.args").write_text(
+                "--model\n/models/test\n", encoding="utf-8"
+            )
+            muse_result = subprocess.run(
+                [str(manager), "compose-config", "vllm", "muse-glimmer"],
+                check=True,
+                text=True,
+                capture_output=True,
+                env=environment,
+            )
+            qwen_result = subprocess.run(
+                [str(manager), "compose-config", "vllm", "qwen"],
+                check=True,
+                text=True,
+                capture_output=True,
+                env=environment,
+            )
+            default_result = subprocess.run(
+                [str(manager), "image", "pull", "vllm"],
+                check=True,
+                text=True,
+                capture_output=True,
+                env=environment,
+            )
+        self.assertEqual(muse_result.stdout.strip(), pinned_image)
+        self.assertEqual(qwen_result.stdout, "\n")
+        self.assertEqual(default_result.stdout, "\n")
+
     def test_markdown_preview_sanitizes_controls_and_honors_terminal_width(self):
         self.assertEqual(
             markdown_renderer.sanitize_terminal_text("safe\x1b[31m\ntext\x7f"),
@@ -109,11 +160,11 @@ class HuggingFaceProfileTests(unittest.TestCase):
                 env=environment,
             )
         models = {item["id"]: item["supported_engines"] for item in json.loads(result.stdout)}
-        self.assertEqual(models["Acme/Hybrid"], ["vllm", "llamacpp"])
+        self.assertEqual(models["Acme/Hybrid"], ["vllm", "sglang", "llamacpp"])
         self.assertEqual(models["Acme/MLX"], [])
         self.assertEqual(models["Acme/VideoGenerator"], [])
         self.assertIn("[1] Acme/Hybrid\n", human_result.stdout)
-        self.assertIn("    engines: vllm,llamacpp", human_result.stdout)
+        self.assertIn("    engines: vllm,sglang,llamacpp", human_result.stdout)
         self.assertIn("\n    downloads: 10", human_result.stdout)
 
     def test_shell_artifact_parser_includes_generated_gguf_shards(self):
@@ -175,6 +226,72 @@ python3 -m vllm.entrypoints.openai.api_server --model Acme/Legacy-7B \\
         plan = hf_helper.vllm_plan("Acme/Legacy-7B", "e" * 40, card)
         self.assertEqual(plan["args"][plan["args"].index("--max-model-len") + 1], "8192")
         self.assertIn("--trust-remote-code", plan["args"])
+
+    def test_sglang_uses_card_settings_and_fixed_local_topology(self):
+        card = """
+## SGLang
+```shell
+python3 -m sglang.launch_server --model-path Acme/Vision-9B \\
+  --host 127.0.0.1 --port 30000 --tp-size 8 --context-length 131072 \\
+  --mem-fraction-static 0.7 --reasoning-parser qwen3 \\
+  --trust-remote-code --api-key do-not-import
+```
+"""
+        info = {
+            "config": {
+                "quantization_config": {
+                    "quant_method": "modelopt",
+                    "config_groups": {
+                        "group_0": {"weights": {"num_bits": 8}},
+                        "group_1": {"weights": {"num_bits": 4}},
+                    },
+                }
+            }
+        }
+        plan = hf_helper.sglang_plan("Acme/Vision-9B", "f" * 40, card, info)
+        args = plan["args"]
+        self.assertEqual(args[args.index("--model-path") + 1], "/models/Acme/Vision-9B")
+        self.assertEqual(args[args.index("--host") + 1], "0.0.0.0")
+        self.assertEqual(args[args.index("--port") + 1], "8080")
+        self.assertEqual(args[args.index("--tp-size") + 1], "1")
+        self.assertEqual(args[args.index("--context-length") + 1], "131072")
+        self.assertEqual(args[args.index("--mem-fraction-static") + 1], "0.7")
+        self.assertEqual(args[args.index("--quantization") + 1], "modelopt_mixed")
+        self.assertIn("--trust-remote-code", args)
+        self.assertNotIn("--api-key", args)
+        self.assertNotIn("do-not-import", args)
+        self.assertTrue(plan["card_command"].startswith("python3 -m sglang.launch_server"))
+
+    def test_sglang_shell_artifacts_include_a_pinned_draft(self):
+        profile = """\
+# hf-revision: /models/Acme/Main {main_revision}
+# hf-revision: /models/Acme/Draft {draft_revision}
+--model-path
+/models/Acme/Main
+--speculative-draft-model-path
+/models/Acme/Draft
+""".format(main_revision="1" * 40, draft_revision="2" * 40)
+        with tempfile.TemporaryDirectory() as directory:
+            profile_path = Path(directory, "profile.args")
+            profile_path.write_text(profile, encoding="utf-8")
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    'manager="$1"; profile="$2"; set -- help; source "$manager" >/dev/null; '
+                    'profile_artifacts sglang "$profile"',
+                    "bash",
+                    str(HELPER_PATH.parent.parent / "dgx-model"),
+                    str(profile_path),
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+        records = result.stdout.splitlines()
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[0].split("\t")[2:], ["Acme/Main", "1" * 40])
+        self.assertEqual(records[1].split("\t")[2:], ["Acme/Draft", "2" * 40])
 
     def test_llama_prefers_card_quantization_and_includes_shards_and_mmproj(self):
         model_id = "Acme/Model-GGUF"

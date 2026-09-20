@@ -1,29 +1,34 @@
-# Pin the validated llama.cpp commit so CUDA, multimodal, and speculative
-# decoding behavior remain reproducible across model profiles.
-FROM nvidia/cuda:13.0.0-devel-ubuntu24.04
+# Use Unsloth's pinned ARM64 CUDA 13 build because it includes the Qwen4Exp
+# MTP graph and shared-tensor borrowing required by the Flash Next sidecar.
+FROM ubuntu:24.04 AS downloader
 
-ARG LLAMA_CPP_COMMIT=6ea215d171fd31df943bf1ac8227129f2b963160
+ARG LLAMA_RELEASE=b10715-mix-86bd2d3
+ARG LLAMA_ARCHIVE_SHA256=ff83d9c33d300ddd21b73ae8b52e37ddf77d5faa5a7c4b264b76fa33efd45e21
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        build-essential ca-certificates cmake curl git libssl-dev \
+        ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git init /opt/llama.cpp \
-    && cd /opt/llama.cpp \
-    && git remote add origin https://github.com/ggml-org/llama.cpp.git \
-    && git fetch --depth 1 origin "${LLAMA_CPP_COMMIT}" \
-    && git checkout --detach FETCH_HEAD \
-    && test "$(git rev-parse HEAD)" = "${LLAMA_CPP_COMMIT}"
+RUN archive="app-${LLAMA_RELEASE}-linux-arm64-cuda13-portable.tar.gz" \
+    && url="https://github.com/unslothai/llama.cpp/releases/download/${LLAMA_RELEASE}/${archive}" \
+    && curl --fail --location --retry 3 --output "/tmp/${archive}" "${url}" \
+    && printf '%s  %s\n' "${LLAMA_ARCHIVE_SHA256}" "/tmp/${archive}" | sha256sum --check - \
+    && mkdir -p /opt/llama.cpp \
+    && tar -xzf "/tmp/${archive}" -C /opt/llama.cpp \
+    && test -x /opt/llama.cpp/llama-server
 
-RUN ln -sf libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
+FROM nvidia/cuda:13.0.0-runtime-ubuntu24.04
 
-RUN cmake -S /opt/llama.cpp -B /opt/llama.cpp/build \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DGGML_CUDA=ON \
-        -DGGML_NATIVE=OFF \
-        -DLLAMA_OPENSSL=ON \
-        -DCMAKE_CUDA_ARCHITECTURES=121 \
-        -DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,/usr/local/cuda/lib64/stubs \
-    && cmake --build /opt/llama.cpp/build --target llama-server --parallel "$(nproc)" \
-    && install -D /opt/llama.cpp/build/bin/llama-server /app/llama-server
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates curl libcurl4t64 libgomp1 libssl3t64 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=downloader /opt/llama.cpp /opt/llama.cpp
+
+ENV LD_LIBRARY_PATH=/opt/llama.cpp
+
+RUN mkdir -p /app \
+    && ln -s /opt/llama.cpp/llama-server /app/llama-server \
+    && /app/llama-server --version

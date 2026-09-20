@@ -6,8 +6,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        LLAMA_CPP_COMMIT: 6ea215d171fd31df943bf1ac8227129f2b963160
-    image: mazi/llama.cpp-deepseek-v4:0731
+        LLAMA_RELEASE: b10715-mix-86bd2d3
+        LLAMA_ARCHIVE_SHA256: ff83d9c33d300ddd21b73ae8b52e37ddf77d5faa5a7c4b264b76fa33efd45e21
+    image: mazi/llama.cpp-qwen38-flash-next:b10715-mtp
     platform: linux/arm64
     container_name: dgx-llamacpp
     entrypoint:

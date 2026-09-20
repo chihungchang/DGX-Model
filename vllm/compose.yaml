@@ -2,7 +2,7 @@ name: dgx-vllm
 
 services:
   vllm:
-    image: vllm/vllm-openai@sha256:7ee49e12fc4f971b91d62b1fdb0409b22f85b071c22bc3d9389c636600ae03b8
+    image: ${VLLM_IMAGE:-vllm/vllm-openai@sha256:7ee49e12fc4f971b91d62b1fdb0409b22f85b071c22bc3d9389c636600ae03b8}
     container_name: dgx-vllm
     entrypoint:
       - /bin/bash
@@ -27,7 +27,7 @@ services:
           urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)"
       interval: 10s
       timeout: 6s
-      start_period: 15m
+      start_period: 30m
       retries: 6
     stop_grace_period: 2m
     logging:

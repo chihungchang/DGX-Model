@@ -1,9 +1,54 @@
+# Only LLM engines and shared scripts belong in this repository.
+# Root-level files remain eligible for tracking.
+/*/
+!/llama.cpp/
+!/vllm/
+!/sglang/
+!/scripts/
+
+# Benchmark scripts, results, and downloaded benchmark sources
+benchmarks/
+/sglang/BENCHMARKS.md
+/sglang/assessments/
+
 # Local secrets and machine-specific configuration
 .env
 .env.*
+*.env
+*.env.*
 !.env.example
+!*.env.example
 *.pem
 *.key
+*.crt
+*.cer
+*.der
+*.csr
+*.p12
+*.pfx
+*.p7b
+*.p7c
+*.jks
+*.keystore
+*.keytab
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+.ssh/
+.aws/
+.azure/
+.kube/
+.netrc
+.npmrc
+.pypirc
+.git-credentials
+credentials
+credentials.*
+secrets/
+secrets.*
+passwords
+passwords.*
 
 # Python and test caches
 __pycache__/
@@ -29,7 +74,3 @@ __pycache__/
 *-bak
 *-backup
 *.codex-baseline-*
-
-# Local services outside the scope of this repository
-/audio/
-/comfyui/

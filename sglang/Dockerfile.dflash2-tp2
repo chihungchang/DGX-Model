@@ -1,0 +1,12 @@
+# Official 2026-09-14 ARM64 CUDA 13 nightly (4358a161), pinned by manifest digest.
+# Contains the merged Qwen image artifact cache from upstream PR #36411.
+FROM lmsysorg/sglang@sha256:c61ec2dad8d8fe040b4e341bc63ede3ff13f14598869e647ea28b4b1f36bd7d5
+
+COPY patches/patch_qwen3_5_mrope.py /tmp/patch_qwen3_5_mrope.py
+RUN python3 /tmp/patch_qwen3_5_mrope.py && rm /tmp/patch_qwen3_5_mrope.py
+
+LABEL org.opencontainers.image.title="DGX Spark SGLang TP2 with image preprocessing cache"
+LABEL org.opencontainers.image.base.name="lmsysorg/sglang:nightly-dev-cu13-20260914-4358a161"
+LABEL org.opencontainers.image.base.digest="sha256:c61ec2dad8d8fe040b4e341bc63ede3ff13f14598869e647ea28b4b1f36bd7d5"
+LABEL org.opencontainers.image.source="https://github.com/sgl-project/sglang"
+LABEL org.opencontainers.image.description="Official ARM64 CUDA 13 nightly with the existing multidimensional Qwen mRoPE guard"

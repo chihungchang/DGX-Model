@@ -1,0 +1,54 @@
+# 2026-09-09: mem fraction 0.51 permits the 261886-input + 256-output test.
+# Previous 0.50 profile saved in benchmarks/tp1-longcontext-20260908/qwen-dspark-mem050.args.
+# Qwen3.8 27B mixed NVFP4/FP8 with the official RadixArk DSpark draft.
+# This profile matches the single-DGX-Spark operating point that measured
+# 36.6 output tok/s at C1 with 128 input and 128 output tokens.  The target and
+# draft revisions are pinned so later Hub updates cannot silently change it.
+# sglang-image: dgx-sglang:qwen38-dspark-repro-v1
+# sglang-base-image: lmsysorg/sglang@sha256:febfb971c7352570fc445c466ebd6ffc9d896024958e544a60f2137fd85856b1
+# hf-model: RadixArk/Qwen3.8-27B-NVFP4
+# hf-revision-id: 319f741cce68d7914884900c138a1fbb70a42f30
+# hf-revision: /models/RadixArk/Qwen3.8-27B-NVFP4 319f741cce68d7914884900c138a1fbb70a42f30
+# hf-revision: /models/RadixArk/Qwen3.8-27B-DSpark b9a5dbdf03bc999c6c73c426b19c2d9041cea393
+--model-path
+/models/RadixArk/Qwen3.8-27B-NVFP4
+--host
+0.0.0.0
+--port
+8080
+--served-model-name
+qwen3.8-27b
+--tp-size
+1
+--context-length
+262144
+--attention-backend
+flashinfer
+--chunked-prefill-size
+8192
+--mem-fraction-static
+0.51
+--disable-prefill-cuda-graph
+--cuda-graph-max-bs-decode
+4
+--reasoning-parser
+qwen3
+--tool-call-parser
+qwen3_coder
+--trust-remote-code
+--speculative-algorithm
+DSPARK
+--speculative-draft-model-path
+/models/RadixArk/Qwen3.8-27B-DSpark
+--speculative-dspark-block-size
+7
+--speculative-draft-model-quantization
+unquant
+--mamba-radix-cache-strategy
+extra_buffer
+--enable-torch-compile
+--torch-compile-max-bs
+4
+--num-continuous-decode-steps
+2
+--sleep-on-idle
