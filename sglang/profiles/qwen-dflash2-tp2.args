@@ -1,0 +1,4 @@
+# cluster: sglang-dflash2-tp2
+# node0-profile: qwen-dflash2-tp2-node0
+# node1-profile: qwen-dflash2-tp2-node1
+# The original per-node profiles and Compose configuration remain authoritative.

@@ -1,0 +1,70 @@
+name: dgx-tensorfold-tp2
+services:
+  tensorfold:
+    image: dgx-tensorfold:deepseek-v41-07aa02585f64-pool-v2-dsml-v1-images-v1
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/arm64
+    container_name: dgx-tensorfold-tp2-r${TENSORFOLD_RANK:?Set TENSORFOLD_RANK}
+    entrypoint: [/bin/bash, /config/launch.sh]
+    command: ["${TENSORFOLD_PROFILE:?Set TENSORFOLD_PROFILE}"]
+    init: true
+    ipc: host
+    network_mode: host
+    gpus: all
+    cpuset: 5-9,15-19
+    restart: "no"
+    mem_limit: 112g
+    memswap_limit: 112g
+    mem_swappiness: 0
+    oom_score_adj: 1000
+    devices:
+      - /dev/infiniband:/dev/infiniband
+    cap_add: [IPC_LOCK]
+    ulimits:
+      memlock: {soft: -1, hard: -1}
+      stack: {soft: 67108864, hard: 67108864}
+    environment:
+      TENSORFOLD_RANK: "${TENSORFOLD_RANK}"
+      TF_DS_REPLAY: "1"
+      TF_DS_REPLAY_FLOOR: "1"
+      TF_DS_PREFILL_CHUNK: "1024"
+      TF_DS_RANK_CACHE: /cache/tf-ds-rank
+      TF_DS_RANK_CACHE_READERS: "32"
+      TF_DS_WARM_LENGTHS: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,33,131,514,1024,2113
+      TF_DS_ENGRAM: /engram
+      TF_DS_TOKEN_MAP: /cache/dsv41-token-map.json
+      TF_DS_ENGRAM_DONTNEED: "1"
+      TF_DS_SPILL_GIB: "8"
+      TF_DS_SPILL_DIR: /cache/tf-ds-spill
+      TF_DS_MEM_FLOOR_GIB: "5"
+      TF_DS_POOL_CONTEXT: "1114112"
+      TF_DS_VISION_ATTENTION: fp32
+      TF_DS_VISION_WARM: largest
+      TF_RDMA_DEVICES: rocep1s0f0,roceP2p1s0f0
+      TF_RDMA_GID_INDEX: "3"
+      NCCL_IB_HCA: rocep1s0f0,roceP2p1s0f0
+      NCCL_IB_GID_INDEX: "3"
+      NCCL_SOCKET_IFNAME: enp1s0f0np0
+      TORCH_EXTENSIONS_DIR: /cache/torch_extensions
+      TRITON_CACHE_DIR: /cache/triton
+      CUDA_CACHE_PATH: /cache/nv
+      HF_HUB_OFFLINE: "1"
+      TORCH_ALLOW_TF32_CUBLAS_OVERRIDE: "0"
+      MAX_JOBS: "4"
+    volumes:
+      - ${TENSORFOLD_MODEL_VIEW:?Set TENSORFOLD_MODEL_VIEW}/model:/model:ro
+      - ${TENSORFOLD_MODEL_VIEW}/engram:/engram:ro
+      - ${TENSORFOLD_CACHE_DIR:?Set TENSORFOLD_CACHE_DIR}:/cache
+      - ./launch.sh:/config/launch.sh:ro
+      - ./profiles:/config/profiles:ro
+    labels:
+      ai.dgx.engine: tensorfold
+      ai.dgx.profile: "${TENSORFOLD_PROFILE}"
+      ai.dgx.cluster: tp2
+    stop_grace_period: 2m
+    logging:
+      driver: json-file
+      options: {max-size: 20m, max-file: "3"}

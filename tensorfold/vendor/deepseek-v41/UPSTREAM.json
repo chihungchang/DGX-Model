@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/Elevatormusic/DeepSeek-V4.1-Flash-1017-EXL3-TensorFold-2x-DGX-Spark",
+  "commit": "3b6d54064241dd7f442ddd2f6079d88e3e3ddb59",
+  "files_copied_without_modification": true,
+  "files": [
+    "LICENSE",
+    "CREDITS.md",
+    "scripts/common.sh",
+    "scripts/download.sh",
+    "scripts/patch_template.py",
+    "verify.sh",
+    "runs/2026-10-17/weights.sha256"
+  ]
+}

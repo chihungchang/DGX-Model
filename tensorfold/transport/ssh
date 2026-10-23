@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# ARM AES acceleration improves bulk model transfers; keep the user's host/key configuration.
+exec /usr/bin/ssh -c aes128-gcm@openssh.com -o Compression=no "$@"

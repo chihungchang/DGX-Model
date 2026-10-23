@@ -5,6 +5,7 @@
 !/vllm/
 !/sglang/
 !/scripts/
+!/tensorfold/
 
 # Benchmark scripts, results, and downloaded benchmark sources
 benchmarks/
@@ -74,3 +75,8 @@ __pycache__/
 *-bak
 *-backup
 *.codex-baseline-*
+
+# TensorFold node configuration, caches, and deployment receipts
+/tensorfold/.state/
+/tensorfold/node*.env
+/tensorfold/vendor/deepseek-v41/.env

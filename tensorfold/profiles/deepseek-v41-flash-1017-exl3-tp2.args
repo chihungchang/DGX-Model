@@ -1,0 +1,39 @@
+# hf-model: LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw
+# hf-revision-id: afc7aa0aab98ee735c0f54e0a122019af1ac08f1
+# engram-model: deepseek-ai/DeepSeek-V4.1-Flash-1017
+# engram-revision-id: 1bae0e1088993b9b82de08f59de5be5a34e42170
+# cluster: tensorfold-tp2
+# tensorfold-image: dgx-tensorfold:deepseek-v41-07aa02585f64-pool-v2-dsml-v1-images-v1
+# tensorfold-commit: 07aa02585f64cfb04c60a96de6554c0d4708ed46
+# context-budget: 1114112 tokens shared by all four concurrent requests
+# per-request-context: 262144 tokens including text, images and the reply
+serve
+/model
+--tp
+2
+--master
+192.168.100.10
+--master-port
+29551
+--host
+0.0.0.0
+--port
+8080
+--name
+deepseek-v4.1-flash-1017
+--alias
+LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw
+--context
+262144
+--parallel
+4
+--vision
+--vision-urls
+--mtp-drafts
+5
+--temperature
+1.0
+--top-p
+1.0
+--no-thinking
+--no-update-check

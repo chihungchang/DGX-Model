@@ -1,13 +1,13 @@
 # DGX model management
 
-`dgx-model` is the only management command for the main vLLM, SGLang, and
-llama.cpp engines on this DGX Spark. Run it from the repository root:
+`dgx-model` manages vLLM, SGLang, llama.cpp, and the TensorFold deployment
+across both DGX Sparks. Run it from spark1 in the repository root:
 
 ```bash
 ./dgx-model --help
 ```
 
-The three main engines are mutually exclusive because they share DGX unified
+The engines are mutually exclusive because they share DGX unified
 memory. `use` validates the target profile, image, and every model artifact
 before it gracefully stops the other engines and starts the selected one. All
 engines use the same fixed host/API port, `8080`.
@@ -104,6 +104,7 @@ While an engine is healthy, its OpenAI-compatible API is available at
 | vLLM | `$HOME/models/huggingface` | `vllm/compose.yaml` and direct `vllm/profiles/*.args` files |
 | SGLang | `$HOME/models/huggingface` | `sglang/compose.yaml` and direct `sglang/profiles/*.args` files |
 | llama.cpp | `$HOME/models/gguf` | `llama.cpp/Dockerfile`, `llama.cpp/compose.yaml`, and direct `llama.cpp/profiles/*.args` files |
+| TensorFold | `$HOME/models/tensorfold` on both nodes | `tensorfold/compose.yaml` and `tensorfold/profiles/*.args`; [deployment and switching](tensorfold/README.md) |
 
 Backup files and directories are ignored and must not be used as configuration
 sources. Runtime state is deliberately not recorded in this document because it
@@ -130,6 +131,7 @@ health.
 | `qwen-mtp3` | Qwen3.8 27B NVFP4 with the embedded three-token MTP head |
 | `qwen-dspark` | Qwen3.8 27B NVFP4 with the pinned block-7 DSpark draft |
 | `qwen-dflash2` | Qwen3.8 27B NVFP4 with pinned DFlash2 draft; concurrency capped at one for correctness |
+| `qwen-dflash2-tp2` | Existing two-Spark Qwen3.8 27B NVFP4/DFlash2 deployment; retains its original per-node settings |
 
 The backend builds locally patched derivatives of pinned SGLang images. The
 DSpark profile uses the exact image manifest from its published 36.6 tok/s
@@ -149,6 +151,33 @@ implementation; text requests retain the fused path. See
 | `qwen36-fable-q4-mtp` | Fable Fusion with embedded MTP and multimodal projector |
 | `qwen38-flash-next-q4` | Qwen3.8 Flash Next UD-IQ4_XS with Q8 MTP=3, lazy PLE, and multimodal projector |
 | `qwythos` | Qwythos 9B with embedded MTP |
+
+### TensorFold on two Sparks
+
+The pinned `deepseek-v41-flash-1017-exl3-tp2` profile uses
+`LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw`, its matching 1017
+Engram tables, and the DeepSeek TP2 TensorFold fork. It serves text and image
+requests with a 262,144-token limit per request, including image tokens and
+the reply, and four concurrent requests on port 8080. Shared KV storage has
+1,114,112 token positions. Images may use base64 data URLs or HTTP(S) URLs.
+Prepare both nodes and switch engines from spark1:
+
+```bash
+./dgx-model image build tensorfold deepseek-v41-flash-1017-exl3-tp2
+python3 scripts/dgx_model_cluster.py extensions tensorfold
+./dgx-model model pull tensorfold deepseek-v41-flash-1017-exl3-tp2
+./dgx-model use tensorfold deepseek-v41-flash-1017-exl3-tp2
+./dgx-model smoke tensorfold
+
+# Return to the existing SGLang configuration on both nodes.
+./dgx-model use sglang qwen-dflash2-tp2
+```
+
+The manager validates both nodes before switching and restores the previous
+SGLang service if TensorFold startup fails. Model files use about 385 GiB
+per node, plus 100–110 GiB for rank caches. See
+[TensorFold operations](tensorfold/README.md) for version pins, storage,
+ComfyUI memory handling, and the full command set.
 
 ## Usage
 

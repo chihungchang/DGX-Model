@@ -5,11 +5,20 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 lock_file="${XDG_RUNTIME_DIR:-/tmp}/dgx-model-${UID}.lock"
 hf_profile_helper="$script_dir/scripts/dgx_model_hf.py"
 markdown_renderer="$script_dir/scripts/dgx_model_markdown.py"
+cluster_helper="$script_dir/scripts/dgx_model_cluster.py"
+
+cluster_cli() {
+  python3 "$cluster_helper" "$@"
+}
+
+is_cluster_profile() {
+  [[ "$1" == tensorfold || ( "$1" == sglang && "$2" == qwen-dflash2-tp2 ) ]]
+}
 
 usage() {
   cat <<'EOF'
 Usage:
-  ./dgx-model list [vllm|sglang|llamacpp]
+  ./dgx-model list [vllm|sglang|llamacpp|tensorfold]
       List profiles, complete model availability, and runtime state.
 
   ./dgx-model show <engine> <profile>
@@ -33,13 +42,13 @@ Usage:
   ./dgx-model image pull vllm [profile]
       Pull the pinned published vLLM image for a profile (or the default).
 
-  ./dgx-model image build <sglang|llamacpp> [profile]
-      Build the pinned local SGLang derivative or llama.cpp CUDA image.
+  ./dgx-model image build <sglang|llamacpp|tensorfold> [profile]
+      Build a pinned local engine image; TensorFold is copied to both Sparks.
 
   ./dgx-model use <engine> <profile> [--recreate]
       Activate a validated profile. The other main engines are stopped first.
 
-  ./dgx-model status [vllm|sglang|llamacpp]
+  ./dgx-model status [vllm|sglang|llamacpp|tensorfold]
       Show the actual Docker state and active profile recovered from Docker.
 
   ./dgx-model logs <engine> [--follow]
@@ -48,7 +57,7 @@ Usage:
   ./dgx-model smoke <engine>
       Send a small OpenAI-compatible chat request to the active engine.
 
-  ./dgx-model stop [vllm|sglang|llamacpp] [--force]
+  ./dgx-model stop [vllm|sglang|llamacpp|tensorfold] [--force]
       Gracefully stop one or all engines; --force uses a zero-second timeout.
 
   ./dgx-model profile remove <engine> <profile> [--delete-files]
@@ -61,6 +70,12 @@ Engines:
   vllm       Hugging Face checkpoints served on port 8080.
   sglang     Hugging Face checkpoints served by SGLang on port 8080.
   llamacpp   GGUF models served by llama.cpp on port 8080.
+  tensorfold Pinned DeepSeek-V4.1 EXL3 engine across two DGX Sparks, port 8080.
+
+Two-node profiles (run from spark1):
+  ./dgx-model use tensorfold deepseek-v41-flash-1017-exl3-tp2
+  ./dgx-model use sglang qwen-dflash2-tp2
+      Switch both nodes; validate the target before stopping the active engine.
 EOF
 }
 
@@ -79,8 +94,8 @@ require_command() {
 
 require_engine() {
   case "${1:-}" in
-    vllm|sglang|llamacpp) ;;
-    *) die 64 "Unknown engine: ${1:-<empty>}. Expected vllm, sglang, or llamacpp." ;;
+    vllm|sglang|llamacpp|tensorfold) ;;
+    *) die 64 "Unknown engine: ${1:-<empty>}. Expected vllm, sglang, llamacpp, or tensorfold." ;;
   esac
 }
 
@@ -89,14 +104,22 @@ engine_dir() {
     vllm) printf '%s/vllm\n' "$script_dir" ;;
     sglang) printf '%s/sglang\n' "$script_dir" ;;
     llamacpp) printf '%s/llama.cpp\n' "$script_dir" ;;
+    tensorfold) printf '%s/tensorfold\n' "$script_dir" ;;
   esac
 }
 
 engine_container() {
   case "$1" in
     vllm) printf 'dgx-vllm\n' ;;
-    sglang) printf 'dgx-sglang\n' ;;
+    sglang)
+      if [[ "$(docker inspect --format '{{.State.Running}}' dgx-sglang-dflash2-tp2 2>/dev/null || true)" == true ]]; then
+        printf 'dgx-sglang-dflash2-tp2\n'
+      else
+        printf 'dgx-sglang\n'
+      fi
+      ;;
     llamacpp) printf 'dgx-llamacpp\n' ;;
+    tensorfold) printf 'dgx-tensorfold-tp2-r0\n' ;;
   esac
 }
 
@@ -105,6 +128,7 @@ engine_port() {
     vllm) printf '8080\n' ;;
     sglang) printf '8080\n' ;;
     llamacpp) printf '8080\n' ;;
+    tensorfold) printf '8080\n' ;;
   esac
 }
 
@@ -113,6 +137,7 @@ engine_profile_env() {
     vllm) printf 'VLLM_PROFILE\n' ;;
     sglang) printf 'SGLANG_PROFILE\n' ;;
     llamacpp) printf 'LLAMA_PROFILE\n' ;;
+    tensorfold) printf 'TENSORFOLD_PROFILE\n' ;;
   esac
 }
 
@@ -123,6 +148,7 @@ engine_model_root() {
   case "$1" in
     vllm|sglang) printf '%s/models/huggingface\n' "$home_dir" ;;
     llamacpp) printf '%s/models/gguf\n' "$home_dir" ;;
+    tensorfold) printf '%s/models/tensorfold\n' "$home_dir" ;;
   esac
 }
 
@@ -130,7 +156,7 @@ other_engines() {
   local selected="$1"
   local engine
 
-  for engine in vllm sglang llamacpp; do
+  for engine in vllm sglang llamacpp tensorfold; do
     [[ "$engine" == "$selected" ]] || printf '%s\n' "$engine"
   done
 }
@@ -454,6 +480,10 @@ container_profile() {
   local engine="$1"
   local container
   container="$(engine_container "$engine")"
+  if [[ "$container" == dgx-sglang-dflash2-tp2 ]]; then
+    printf 'qwen-dflash2-tp2\n'
+    return
+  fi
   docker inspect --format '{{if .Config.Cmd}}{{index .Config.Cmd 0}}{{end}}' \
     "$container" 2>/dev/null || true
 }
@@ -497,23 +527,31 @@ acquire_lock() {
 
 list_profiles() {
   local filter="${1:-}"
-  local engine directory profile_file profile api_name context artifacts runtime active_profile marker model
-  local -a engines=(vllm sglang llamacpp)
+  local engine directory profile_file profile api_name context artifacts runtime active_profile marker model profile_runtime
+  local -a engines=(vllm sglang llamacpp tensorfold)
 
   if [[ -n "$filter" ]]; then
     require_engine "$filter"
     engines=("$filter")
   fi
 
-  printf '%-10s %-30s %-27s %-9s %-14s %-20s %s\n' \
+  printf '%-10s %-40s %-27s %-9s %-14s %-20s %s\n' \
     ENGINE PROFILE API_NAME CONTEXT MODELS RUNTIME MODEL
   for engine in "${engines[@]}"; do
+    if [[ "$engine" == tensorfold ]]; then
+      cluster_cli list tensorfold
+      continue
+    fi
     directory="$(engine_dir "$engine")"
     active_profile="$(container_profile "$engine")"
     runtime="$(container_runtime_state "$engine")"
     while IFS= read -r profile_file; do
       profile="${profile_file##*/}"
       profile="${profile%.args}"
+      if is_cluster_profile "$engine" "$profile"; then
+        cluster_cli list "$engine" "$profile"
+        continue
+      fi
       marker=""
       [[ "$profile" == "$active_profile" ]] && marker="*"
       if [[ "$engine" == vllm ]]; then
@@ -531,9 +569,11 @@ list_profiles() {
         context="$(arg_value --ctx-size "$profile_file" || true)"
       fi
       artifacts="$(profile_artifact_state "$engine" "$profile_file")"
-      printf '%-10s %-30s %-27s %-9s %-14s %-20s %s\n' \
+      profile_runtime=-
+      [[ "$profile" != "$active_profile" ]] || profile_runtime="$runtime"
+      printf '%-10s %-40s %-27s %-9s %-14s %-20s %s\n' \
         "$engine" "${marker}${profile}" "${api_name:--}" "${context:--}" \
-        "$artifacts" "$([[ "$profile" == "$active_profile" ]] && printf '%s' "$runtime" || printf '-')" \
+        "$artifacts" "$profile_runtime" \
         "${model#/models/}"
     done < <(find "$directory/profiles" -maxdepth 1 -type f -name '*.args' -print | sort)
   done
@@ -544,6 +584,11 @@ show_profile() {
   local profile="$2"
   local profile_file image active_profile runtime records
   local kind container_path source checksum host_path state
+
+  if is_cluster_profile "$engine" "$profile"; then
+    cluster_cli show "$engine" "$profile"
+    return
+  fi
 
   profile_file="$(profile_file_for "$engine" "$profile")"
   image="$(configured_image "$engine" "$profile")"
@@ -579,6 +624,15 @@ validate_profile() {
   local profile="$2"
   local require_artifacts="${3:-1}"
   local profile_file records kind container_path source checksum host_path count=0 missing=0
+
+  if is_cluster_profile "$engine" "$profile"; then
+    if (( require_artifacts == 1 )); then
+      cluster_cli validate "$engine" "$profile"
+    else
+      cluster_cli validate-config "$engine" "$profile"
+    fi
+    return
+  fi
 
   profile_file="$(profile_file_for "$engine" "$profile")"
   compose_for "$engine" "$profile" config --quiet
@@ -725,6 +779,14 @@ pull_models() {
   local profile_file records kind container_path source checksum host_path revision
   local hf_model hf_revision_id hf_filename hf_prefix
   local -a hf_args=()
+
+  if is_cluster_profile "$engine" "$profile"; then
+    [[ "$engine" == tensorfold ]] || die 64 'The existing SGLang TP2 weights are managed by the per-node profiles.'
+    (( force == 0 )) || die 64 'TensorFold reuses completed files and verifies pins; --force is not supported.'
+    (( lock_held == 1 )) || acquire_lock
+    cluster_cli model-pull "$engine" "$profile"
+    return
+  fi
 
   profile_file="$(profile_file_for "$engine" "$profile")"
   validate_profile "$engine" "$profile" 0 >/dev/null
@@ -1036,6 +1098,22 @@ stop_engine() {
   local force="$2"
   local profile
 
+  if [[ "$engine" == tensorfold ]]; then
+    if (( force == 1 )); then
+      cluster_cli stop tensorfold --force
+    else
+      cluster_cli stop tensorfold
+    fi
+    return
+  fi
+  if [[ "$engine" == sglang ]]; then
+    if (( force == 1 )); then
+      cluster_cli stop sglang --force
+    else
+      cluster_cli stop sglang
+    fi
+  fi
+
   profile="$(container_profile "$engine")"
   # Compose requires the profile environment variable even for `down`, but it
   # never reads the corresponding args file while removing the project.
@@ -1054,7 +1132,18 @@ use_profile() {
   local other current_profile runtime
 
   acquire_lock
+  if is_cluster_profile "$engine" "$profile"; then
+    if (( recreate == 1 )); then
+      cluster_cli use "$engine" "$profile" --recreate
+    else
+      cluster_cli use "$engine" "$profile"
+    fi
+    return
+  fi
   validate_profile "$engine" "$profile" 1
+  if [[ "$engine" == sglang ]]; then
+    cluster_cli stop sglang
+  fi
 
   current_profile="$(container_profile "$engine")"
   runtime="$(container_runtime_state "$engine")"
@@ -1080,6 +1169,16 @@ use_profile() {
 status_engine() {
   local engine="$1"
   local container profile runtime port
+  if [[ "$engine" == tensorfold ]]; then
+    cluster_cli status tensorfold
+    return
+  fi
+  if [[ "$engine" == sglang ]] &&
+     docker inspect dgx-sglang-dflash2-tp2 >/dev/null 2>&1 &&
+     [[ "$(docker inspect --format '{{.State.Running}}' dgx-sglang 2>/dev/null || true)" != true ]]; then
+    cluster_cli status sglang
+    return
+  fi
   container="$(engine_container "$engine")"
   profile="$(container_profile "$engine")"
   runtime="$(container_runtime_state "$engine")"
@@ -1096,6 +1195,10 @@ status_engine() {
 smoke_engine() {
   local engine="$1"
   local profile profile_file model port payload response reasoning_parser
+  if [[ "$engine" == tensorfold ]] || { [[ "$engine" == sglang ]] && cluster_cli active sglang; }; then
+    cluster_cli smoke "$engine"
+    return
+  fi
   require_command jq
   profile="$(container_profile "$engine")"
   [[ -n "$profile" ]] || die 69 "No $engine container is active."
@@ -1248,6 +1351,10 @@ remove_profile() {
   local -a paths=() keys=() shared_by=()
   local duplicate existing_key i
 
+  if is_cluster_profile "$engine" "$profile"; then
+    die 64 'Cluster profiles are managed with their two-node configuration; profile removal is not supported.'
+  fi
+
   acquire_lock
   profile_file="$(profile_file_for "$engine" "$profile")"
   active_profile="$(container_profile "$engine")"
@@ -1294,7 +1401,7 @@ remove_profile() {
 action="${1:-}"
 case "$action" in
   list)
-    (( $# <= 2 )) || die 64 'Usage: ./dgx-model list [vllm|sglang|llamacpp]'
+    (( $# <= 2 )) || die 64 'Usage: ./dgx-model list [vllm|sglang|llamacpp|tensorfold]'
     list_profiles "${2:-}"
     ;;
   show)
@@ -1372,6 +1479,7 @@ case "$action" in
     (( $# >= 3 )) ||
       die 64 'Usage: ./dgx-model install <engine> <model-id> [--profile NAME] [--gguf FILE] [--force]'
     require_engine "$2"
+    [[ "$2" != tensorfold ]] || die 64 'TensorFold uses a pinned cluster profile. Run: ./dgx-model model pull tensorfold deepseek-v41-flash-1017-exl3-tp2'
     requested_profile=""
     gguf_file=""
     force=0
@@ -1398,7 +1506,7 @@ case "$action" in
     ;;
   image)
     (( $# == 3 || $# == 4 )) ||
-      die 64 'Usage: ./dgx-model image pull vllm [profile] | image build <sglang|llamacpp> [profile]'
+      die 64 'Usage: ./dgx-model image pull vllm [profile] | image build <sglang|llamacpp|tensorfold> [profile]'
     require_engine "$3"
     acquire_lock
     if (( $# == 4 )); then
@@ -1414,10 +1522,12 @@ case "$action" in
       pull/vllm) compose_for vllm "$profile" pull ;;
       build/sglang) compose_for sglang "$profile" build --pull ;;
       build/llamacpp) compose_for llamacpp "$profile" build ;;
+      build/tensorfold) cluster_cli image-build tensorfold "$profile" ;;
+      pull/tensorfold) die 64 'TensorFold uses a pinned local build. Run: ./dgx-model image build tensorfold' ;;
       pull/llamacpp) die 64 'llama.cpp uses a local build. Run: ./dgx-model image build llamacpp' ;;
       pull/sglang) die 64 'SGLang uses a pinned local derivative. Run: ./dgx-model image build sglang' ;;
       build/vllm) die 64 'vLLM uses a pinned published image. Run: ./dgx-model image pull vllm' ;;
-      *) die 64 'Usage: ./dgx-model image pull vllm [profile] | image build <sglang|llamacpp> [profile]' ;;
+      *) die 64 'Usage: ./dgx-model image pull vllm [profile] | image build <sglang|llamacpp|tensorfold> [profile]' ;;
     esac
     ;;
   use)
@@ -1431,7 +1541,7 @@ case "$action" in
     use_profile "$2" "$3" "$recreate"
     ;;
   status)
-    (( $# <= 2 )) || die 64 'Usage: ./dgx-model status [vllm|sglang|llamacpp]'
+    (( $# <= 2 )) || die 64 'Usage: ./dgx-model status [vllm|sglang|llamacpp|tensorfold]'
     if [[ -n "${2:-}" ]]; then
       require_engine "$2"
       status_engine "$2"
@@ -1439,6 +1549,7 @@ case "$action" in
       status_engine vllm
       status_engine sglang
       status_engine llamacpp
+      status_engine tensorfold
     fi
     ;;
   logs)
@@ -1457,12 +1568,12 @@ case "$action" in
     smoke_engine "$2"
     ;;
   stop)
-    (( $# <= 3 )) || die 64 'Usage: ./dgx-model stop [vllm|sglang|llamacpp] [--force]'
+    (( $# <= 3 )) || die 64 'Usage: ./dgx-model stop [vllm|sglang|llamacpp|tensorfold] [--force]'
     stop_engine_name=""
     force=0
     for option in "${@:2}"; do
       case "$option" in
-        vllm|sglang|llamacpp)
+        vllm|sglang|llamacpp|tensorfold)
           [[ -z "$stop_engine_name" ]] || die 64 'Only one engine may be specified.'
           stop_engine_name="$option"
           ;;
@@ -1477,6 +1588,7 @@ case "$action" in
       stop_engine vllm "$force"
       stop_engine sglang "$force"
       stop_engine llamacpp "$force"
+      stop_engine tensorfold "$force"
     fi
     ;;
   profile)
@@ -1494,7 +1606,11 @@ case "$action" in
     (( $# == 3 )) || die 64 'Usage: ./dgx-model compose-config <engine> <profile>'
     require_engine "$2"
     profile_file_for "$2" "$3" >/dev/null
-    compose_for "$2" "$3" config
+    if is_cluster_profile "$2" "$3"; then
+      cluster_cli compose-config "$2" "$3"
+    else
+      compose_for "$2" "$3" config
+    fi
     ;;
   -h|--help|help|'')
     usage
