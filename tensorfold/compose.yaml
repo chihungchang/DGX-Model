@@ -1,7 +1,7 @@
 name: dgx-tensorfold-tp2
 services:
   tensorfold:
-    image: dgx-tensorfold:deepseek-v41-07aa02585f64-pool-v2-dsml-v1-images-v1
+    image: dgx-tensorfold:deepseek-v41-07aa02585f64-pool-v2-dsml-v1-images-v1-output-ceiling-v1
     pull_policy: never
     build:
       context: .

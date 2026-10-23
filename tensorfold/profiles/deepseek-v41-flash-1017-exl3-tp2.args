@@ -3,7 +3,7 @@
 # engram-model: deepseek-ai/DeepSeek-V4.1-Flash-1017
 # engram-revision-id: 1bae0e1088993b9b82de08f59de5be5a34e42170
 # cluster: tensorfold-tp2
-# tensorfold-image: dgx-tensorfold:deepseek-v41-07aa02585f64-pool-v2-dsml-v1-images-v1
+# tensorfold-image: dgx-tensorfold:deepseek-v41-07aa02585f64-pool-v2-dsml-v1-images-v1-output-ceiling-v1
 # tensorfold-commit: 07aa02585f64cfb04c60a96de6554c0d4708ed46
 # context-budget: 1114112 tokens shared by all four concurrent requests
 # per-request-context: 262144 tokens including text, images and the reply

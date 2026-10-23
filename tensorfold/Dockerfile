@@ -18,6 +18,8 @@ COPY patches/dsml_single_tool.py /tmp/dsml_single_tool.py
 RUN python /tmp/dsml_single_tool.py
 COPY patches/deepseek_image_context.py /tmp/deepseek_image_context.py
 RUN python /tmp/deepseek_image_context.py
+COPY patches/output_context_ceiling.py /tmp/output_context_ceiling.py
+RUN python /tmp/output_context_ceiling.py
 ENV TORCH_EXTENSIONS_DIR=/cache/torch_extensions
 WORKDIR /opt/tensorfold
 LABEL org.opencontainers.image.source="https://github.com/Elevatormusic/TensorFold" \
@@ -28,3 +30,5 @@ LABEL org.opencontainers.image.source="https://github.com/Elevatormusic/TensorFo
 LABEL ai.dgx.tensorfold.dsml-single-tool="v1"
 
 LABEL ai.dgx.tensorfold.image-context="v1"
+
+LABEL ai.dgx.tensorfold.output-ceiling="v1"

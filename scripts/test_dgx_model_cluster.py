@@ -31,6 +31,9 @@ class ClusterSwitchTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "context-based image"):
                 cluster.image_info(0)
             labels["ai.dgx.tensorfold.image-context"] = "v1"
+            with self.assertRaisesRegex(ValueError, "remaining-context output"):
+                cluster.image_info(0)
+            labels["ai.dgx.tensorfold.output-ceiling"] = "v1"
             self.assertEqual(cluster.image_info(0), "image-test")
 
     def test_extension_cache_must_match_image_and_have_all_binaries(self):

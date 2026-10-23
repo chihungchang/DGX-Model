@@ -85,6 +85,34 @@ images and SSE with twelve images returned every label in order after deploy.
 The upstream revision, single-tool policy, DSML fix, context pool, model weights
 and CUDA dependencies are unchanged.
 
+## Output ceilings and context admission (2026-10-23)
+
+`patches/output_context_ceiling.py` makes the CUDA server's explicit
+`max_tokens` / `max_completion_tokens` a generation ceiling. A fitting rendered
+prompt is accepted in full; the existing `prepare()` guard caps generation to
+`min(requested maximum, effective context - rendered prompt tokens)`. Input is
+never trimmed to reserve the maximum reply. A prompt that fills the effective
+window still fails before generation. Native model and safe engine capacities
+remain enforced; accounting still reports actual input/output tokens.
+
+This corrects a Mazi request with 207,521 input tokens and a 65,535-token output
+ceiling: the 262,144-token service can admit its complete prompt and generate up
+to 54,623 further tokens. Mazi's separate 85% provider-usage compaction trigger,
+image history, single-tool policy, model weights and context pool are unchanged.
+GLM's separate family-specific admission override is outside this deployment.
+
+Both ranks must use `-pool-v2-dsml-v1-images-v1-output-ceiling-v1`; the manager
+verifies `ai.dgx.tensorfold.output-ceiling=v1` together with the existing labels.
+Keep the previous image and each rank's own extension receipt before switching.
+The deployment backup and evidence are in `.state/output-context-20261023/`.
+
+`tests/test_output_context_ceiling.py` covers the incident, both output fields,
+JSON/SSE, chat/completions, actual usage and true full-input refusal. When running
+the pinned upstream tests in a separate GPU-free container, first execute
+`tests/prepare_output_context_tests.py` there to update the three admission tests
+whose expected policy changed. It preserves real input-overflow checks and the
+unrelated GLM policy. Do not patch tests or run Python in a serving rank.
+
 ## Switch back to the existing SGLang deployment
 
 ```bash

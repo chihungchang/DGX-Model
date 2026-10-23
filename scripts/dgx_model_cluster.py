@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKER = "spark2"
 TF_PROFILE = "deepseek-v41-flash-1017-exl3-tp2"
 SG_PROFILE = "qwen-dflash2-tp2"
-TF_IMAGE = "dgx-tensorfold:deepseek-v41-07aa02585f64-pool-v2-dsml-v1-images-v1"
+TF_IMAGE = "dgx-tensorfold:deepseek-v41-07aa02585f64-pool-v2-dsml-v1-images-v1-output-ceiling-v1"
 TF_COMMIT = "07aa02585f64cfb04c60a96de6554c0d4708ed46"
 TF_BASE_CONFIG = "sha256:15b8de8baabe68e46afc51e88f3ccad5042013bafe8f244ec082ce0bb06d47e3"
 TF_LOCAL_BASE = "nvcr.io/nvidia/pytorch:26.07-py3-verified-arm64"
@@ -137,6 +137,9 @@ def image_info(rank):
     image_context = (item["Config"].get("Labels") or {}).get("ai.dgx.tensorfold.image-context")
     if image_context != "v1":
         raise ValueError(f"Rank {rank}: TensorFold image lacks context-based image history admission")
+    output_ceiling = (item["Config"].get("Labels") or {}).get("ai.dgx.tensorfold.output-ceiling")
+    if output_ceiling != "v1":
+        raise ValueError(f"Rank {rank}: TensorFold image lacks remaining-context output capping")
     return item["Id"]
 
 
