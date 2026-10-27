@@ -1,6 +1,8 @@
 # Two DGX Spark nodes; one GPU per node.
+# hf-revision: /models/edp1096/Huihui-RadixArk-Qwen3.8-27B-abliterated-NVFP4 21565d389fe573a32c1c425e0c7ade204ddb2263
+# hf-revision: /models/maurienne-ai/Qwen3.8-27B-DFlash2-NVFP4-RTNcal bd7a934213c47a9e7ef69eef36bb3325f47fd1f1
 --model-path
-/models/RadixArk/Qwen3.8-27B-NVFP4
+/models/edp1096/Huihui-RadixArk-Qwen3.8-27B-abliterated-NVFP4
 --host
 0.0.0.0
 --port
@@ -19,7 +21,7 @@ flashinfer
 0.50
 --disable-prefill-cuda-graph
 --cuda-graph-max-bs-decode
-4
+5
 --reasoning-parser
 qwen3
 --tool-call-parser
@@ -28,7 +30,11 @@ qwen3_coder
 --speculative-algorithm
 DFLASH
 --speculative-draft-model-path
-/models/incoai/Qwen3.8-27B-DFlash2
+/models/maurienne-ai/Qwen3.8-27B-DFlash2-NVFP4-RTNcal
+--speculative-draft-model-revision
+bd7a934213c47a9e7ef69eef36bb3325f47fd1f1
+--speculative-draft-model-quantization
+modelopt_fp4
 --speculative-num-draft-tokens
 8
 --mamba-radix-cache-strategy
@@ -42,7 +48,7 @@ extra_buffer
 192.168.100.10:50010
 --disable-custom-all-reduce
 --max-running-requests
-3
+5
 --kv-cache-dtype
 fp8_e4m3
 
@@ -51,3 +57,10 @@ fp8_e4m3
 2048
 --mm-feature-transport
 cpu
+
+# Correlated raw Responses requests, effective budgets and engine terminal reasons.
+--log-requests
+--log-requests-level
+3
+--log-requests-format
+json

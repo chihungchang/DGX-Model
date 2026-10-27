@@ -1,6 +1,8 @@
 # Two DGX Spark nodes; one GPU per node.
+# hf-revision: /models/edp1096/Huihui-RadixArk-Qwen3.8-27B-abliterated-NVFP4 21565d389fe573a32c1c425e0c7ade204ddb2263
+# hf-revision: /models/RadixArk/Qwen3.8-27B-DSpark b9a5dbdf03bc999c6c73c426b19c2d9041cea393
 --model-path
-/models/RadixArk/Qwen3.8-27B-NVFP4
+/models/edp1096/Huihui-RadixArk-Qwen3.8-27B-abliterated-NVFP4
 --host
 0.0.0.0
 --port
@@ -29,17 +31,14 @@ qwen3_coder
 DSPARK
 --speculative-draft-model-path
 /models/RadixArk/Qwen3.8-27B-DSpark
---speculative-dspark-block-size
-7
+--speculative-draft-model-revision
+b9a5dbdf03bc999c6c73c426b19c2d9041cea393
 --speculative-draft-model-quantization
 unquant
+--speculative-dspark-block-size
+7
 --mamba-radix-cache-strategy
 extra_buffer
---enable-torch-compile
---torch-compile-max-bs
-4
---num-continuous-decode-steps
-2
 --sleep-on-idle
 --nnodes
 2
@@ -48,3 +47,13 @@ extra_buffer
 --dist-init-addr
 192.168.100.10:50000
 --disable-custom-all-reduce
+--max-running-requests
+3
+--kv-cache-dtype
+fp8_e4m3
+
+# Reuse CPU image preprocessing artifacts across turns (2 GiB budget).
+--mm-preprocess-cache-size-mb
+2048
+--mm-feature-transport
+cpu

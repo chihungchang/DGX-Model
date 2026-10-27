@@ -6,8 +6,9 @@ remote_compose='cd /home/chihung/ai/sglang && docker compose --env-file tp2-node
 case "${1:-status}" in
   start)
     "${local_compose[@]}" config --quiet
-    ssh -o BatchMode=yes spark2 "${remote_compose} config --quiet && docker image inspect dgx-sglang:qwen38-dflash2-mmcache-20260914 >/dev/null && test -r /home/chihung/models/huggingface/incoai/Qwen3.8-27B-DFlash2/model.safetensors"
-    docker image inspect dgx-sglang:qwen38-dflash2-mmcache-20260914 >/dev/null
+    ssh -o BatchMode=yes spark2 "${remote_compose} config --quiet && docker image inspect dgx-sglang:qwen38-dflash2-nightly-20261016-localfix-v1 >/dev/null && test -r /home/chihung/models/huggingface/maurienne-ai/Qwen3.8-27B-DFlash2-NVFP4-RTNcal/model.safetensors"
+    docker image inspect dgx-sglang:qwen38-dflash2-nightly-20261016-localfix-v1 >/dev/null
+    test -r /home/chihung/models/huggingface/maurienne-ai/Qwen3.8-27B-DFlash2-NVFP4-RTNcal/model.safetensors
     if docker inspect dgx-sglang-tp2 >/dev/null 2>&1; then
       docker update --restart=no dgx-sglang-tp2 >/dev/null
     fi

@@ -1,12 +1,24 @@
-# Official 2026-09-14 ARM64 CUDA 13 nightly (4358a161), pinned by manifest digest.
-# Contains the merged Qwen image artifact cache from upstream PR #36411.
-FROM lmsysorg/sglang@sha256:c61ec2dad8d8fe040b4e341bc63ede3ff13f14598869e647ea28b4b1f36bd7d5
+# Official 2026-10-16 ARM64 CUDA 13 nightly (a93f16f0), pinned by manifest digest.
+# This official image checks out runtime commit c15edf314 (six commits newer).
+# Upstream fused Qwen mRoPE now handles 3D positions through its axis map, so the
+# old native-path workaround is no longer applied to this TP2 image.
+FROM lmsysorg/sglang@sha256:0b3e39704480c423d8a00ca15ebee63154defc62944df2d4b11c594563bab457
 
-COPY patches/patch_qwen3_5_mrope.py /tmp/patch_qwen3_5_mrope.py
-RUN python3 /tmp/patch_qwen3_5_mrope.py && rm /tmp/patch_qwen3_5_mrope.py
+COPY patches/patch_qwen_mm_pickle.py /tmp/patch_qwen_mm_pickle.py
+COPY tests/test_qwen_mm_pickle.py /tmp/test_qwen_mm_pickle.py
+RUN python3 /tmp/patch_qwen_mm_pickle.py && \
+    CUDA_VISIBLE_DEVICES="" OMP_NUM_THREADS=1 python3 /tmp/test_qwen_mm_pickle.py && \
+    rm /tmp/patch_qwen_mm_pickle.py /tmp/test_qwen_mm_pickle.py
+
+COPY patches/patch_responses_observability.py /tmp/patch_responses_observability.py
+COPY tests/test_responses_observability.py /tmp/test_responses_observability.py
+RUN python3 /tmp/patch_responses_observability.py && \
+    CUDA_VISIBLE_DEVICES="" OMP_NUM_THREADS=1 python3 /tmp/test_responses_observability.py && \
+    rm /tmp/patch_responses_observability.py /tmp/test_responses_observability.py
 
 LABEL org.opencontainers.image.title="DGX Spark SGLang TP2 with image preprocessing cache"
-LABEL org.opencontainers.image.base.name="lmsysorg/sglang:nightly-dev-cu13-20260914-4358a161"
-LABEL org.opencontainers.image.base.digest="sha256:c61ec2dad8d8fe040b4e341bc63ede3ff13f14598869e647ea28b4b1f36bd7d5"
+LABEL org.opencontainers.image.base.name="lmsysorg/sglang:nightly-dev-cu13-20261016-a93f16f0"
+LABEL org.opencontainers.image.base.digest="sha256:0b3e39704480c423d8a00ca15ebee63154defc62944df2d4b11c594563bab457"
+LABEL org.opencontainers.image.revision="c15edf314d20073630e672eb477cbcc3c58fac57"
 LABEL org.opencontainers.image.source="https://github.com/sgl-project/sglang"
-LABEL org.opencontainers.image.description="Official ARM64 CUDA 13 nightly with the existing multidimensional Qwen mRoPE guard"
+LABEL org.opencontainers.image.description="Official ARM64 CUDA 13 nightly with upstream fused mRoPE, compact CPU image artifacts and correlated Responses logs"

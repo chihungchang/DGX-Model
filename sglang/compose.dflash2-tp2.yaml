@@ -1,7 +1,7 @@
 name: dgx-sglang-dflash2-tp2
 services:
   sglang:
-    image: dgx-sglang:qwen38-dflash2-mmcache-20260914
+    image: dgx-sglang:qwen38-dflash2-nightly-20261016-localfix-v1
     pull_policy: never
     platform: linux/arm64
     container_name: dgx-sglang-dflash2-tp2

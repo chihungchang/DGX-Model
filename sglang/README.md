@@ -1,5 +1,28 @@
 # DGX Spark SGLang backend
 
+2026-10-16 雙機 DFlash2 TP2 的併發上限改為 5，decode CUDA graph 批次上限同步設為 5。
+設定、驗證與回退資料見 [DFlash2 TP2 部署](DFLASH2-TP2.md)。
+
+2026-10-16 DFlash2 TP2 兩台升級為官方 CUDA 13 nightly
+`nightly-dev-cu13-20261016-a93f16f0`（映像內實際 SGLang commit `c15edf314`）。
+上游已修復 fused mRoPE，本 TP2 映像移除舊繞道；多圖 CPU pickle 與
+Responses 日誌補丁仍須保留。固定 digest、補丁核對、驗證與回退見
+[DFlash2 TP2 部署](DFLASH2-TP2.md)。
+
+2026-10-07 已修正 DFlash2 TP2 的多圖 pickle 記憶體放大問題；兩台當時使用
+`qwen38-dflash2-mmcache-oomfix-20261007` 映像，保留 2 GiB 圖片快取。
+修正、建置、驗證與回退方式見 [DFlash2 TP2 部署](DFLASH2-TP2.md)。
+
+2026-09-29 目前啟用 **Huihui + 校準 NVFP4 DFlash2 雙機 TP2**，草稿長度 8。DSpark 同條件、單請求短測慢約 18–25%，比較後已依要求切回 DFlash2；DSpark 配置保留、服務停止。操作入口為 `./sglang/dflash2-tp2.sh`，API 8080／`qwen3.8-27b`。[目前部署](DFLASH2-TP2.md)、[decode 比較與回切紀錄](backups/huihui-dspark-20260929-150205/REPORT.md)。以下為較早的切換紀錄。
+
+2026-09-29 主模型改用 `edp1096/Huihui-RadixArk-Qwen3.8-27B-abliterated-NVFP4`，保留目前校準 NVFP4 DFlash2 草稿、雙機 TP=2 與 API 名稱 `qwen3.8-27b`。[切換與驗證紀錄](backups/huihui-main-20260929-144644/REPORT.md)；固定配置與回退方式見 [DFlash2 TP2 部署](DFLASH2-TP2.md)。
+
+2026-09-29 目前雙機 DFlash2 草稿改用 `maurienne-ai/Qwen3.8-27B-DFlash2-NVFP4-RTNcal`，`modelopt_fp4`、草稿長度維持 8；兩台 `qwen-dflash2-tp2-node{0,1}` profiles 已更新。[切換與驗證紀錄](backups/nvfp4-draft-20260929/REPORT.md)。
+
+2026-09-29 已恢復 Qwen3.8-27B uncensored 雙機 DFlash2 部署；目前操作入口為 `./sglang/dflash2-tp2.sh`，API 8080。GLM 部署與權重已移除，回復驗證見 [紀錄](backups/qwen-restore-20260929/REPORT.md)。
+
+2026-09-21 DFlash2 TP2 主模型改用 `orcarouter/Qwen3.8-27B-Uncensored-NVFP4`，API 名稱維持 `qwen3.8-27b`；草稿仍為 `incoai/Qwen3.8-27B-DFlash2`，比較長度 4 後恢復為 8。版本與回退方式見 [DFlash2 TP2 部署](DFLASH2-TP2.md)。
+
 2026-09-09 已完成 [單機／雙機效能比較](benchmarks/TP1-vs-TP2-20260908.md)。
 2026-09-09 新增並啟用 [DFlash2 TP2 部署](DFLASH2-TP2.md)：API 8080，模型 `qwen3.8-27b`，草稿長度 8。
 2026-09-14 DFlash2 雙機已升級至官方 CUDA 13 nightly `4358a161`，啟用 2048 MiB 圖片前處理快取；[實測結果與回退方式](DFLASH2-TP2.md)。以下單機／DSpark 的版本敘述保留各自部署設定。

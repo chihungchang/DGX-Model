@@ -1,3 +1,7 @@
 **
 !patches/
-!patches/patch_qwen3_5_mrope.py
+!patches/patch_qwen_mm_pickle.py
+!tests/
+!tests/test_qwen_mm_pickle.py
+!patches/patch_responses_observability.py
+!tests/test_responses_observability.py

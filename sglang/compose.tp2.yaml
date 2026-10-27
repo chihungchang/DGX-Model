@@ -1,7 +1,7 @@
 name: dgx-sglang-tp2
 services:
   sglang:
-    image: dgx-sglang:qwen38-dspark-repro-v1
+    image: dgx-sglang:qwen38-dflash2-mmcache-20260914
     pull_policy: never
     platform: linux/arm64
     container_name: dgx-sglang-tp2
