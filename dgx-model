@@ -370,7 +370,27 @@ artifact_ready() {
   local engine="$1"
   local host_path="$2"
   case "$engine" in
-    vllm|sglang) [[ -d "$host_path" && -r "$host_path/config.json" ]] ;;
+    vllm|sglang)
+      [[ -d "$host_path" && -r "$host_path/config.json" ]] || return 1
+      # HF writes config before finishing weights. A config alone is not ready.
+      python3 - "$host_path" <<'PY'
+import json
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+try:
+    indexes = list(root.glob('*.safetensors.index.json')) + list(root.glob('pytorch_model*.index.json'))
+    if indexes:
+        shards = {name for index in indexes for name in json.loads(index.read_text())['weight_map'].values()}
+        ready = bool(shards) and all((root / name).is_file() and (root / name).stat().st_size > 0 for name in shards)
+    else:
+        ready = any(p.stat().st_size > 0 for pattern in ('*.safetensors', 'pytorch_model*.bin') for p in root.glob(pattern))
+except (OSError, ValueError, KeyError, TypeError):
+    ready = False
+sys.exit(0 if ready else 1)
+PY
+      ;;
     llamacpp) [[ -f "$host_path" && -r "$host_path" ]] ;;
   esac
 }
@@ -1053,7 +1073,7 @@ wait_until_healthy() {
     health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container" 2>/dev/null || true)"
     case "$status/$health" in
       running/healthy)
-        if curl --fail --silent --show-error "http://127.0.0.1:${port}/v1/models"; then
+        if curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:${port}/v1/models"; then
           printf '\n'
           return 0
         fi

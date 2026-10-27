@@ -36,6 +36,7 @@ class HuggingFaceProfileTests(unittest.TestCase):
             fake_docker.chmod(0o755)
             environment = os.environ.copy()
             environment["PATH"] = f"{directory}:{environment['PATH']}"
+            environment["XDG_RUNTIME_DIR"] = directory
             environment["VLLM_IMAGE"] = "untrusted/ambient:latest"
             repository = HELPER_PATH.parent.parent
             manager = Path(directory, "dgx-model")
