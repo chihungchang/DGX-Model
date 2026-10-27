@@ -10,6 +10,13 @@ The local CUDA image is
 architecture used by Qwen3.8 Flash Next, including lazy PLE loading and its
 shared MTP sidecar. GGUF files are mounted read-only from `$HOME/models/gguf`.
 
+The retained SC117 IQ3_S TP2 profile uses a separate CUDA/RPC/NCCL image, three
+parallel slots with 256K context each, and Q4_0 MTP depth 4. Its weights were
+downloaded and SHA-256 verified on 2026-10-07. See [TP2.md](TP2.md) for deployment details and the same-prompt
+comparison against SGLang. This Flash deployment was stopped on 2026-10-07
+at the user's request to restore the original SGLang service; its profile and
+model weights remain available.
+
 ## Installed profiles
 
 | Profile | Context | Speculation / purpose |
@@ -20,6 +27,7 @@ shared MTP sidecar. GGUF files are mounted read-only from `$HOME/models/gguf`.
 | `qwen36-27b-q4-mtp-c4` | 1,048,576 | External MTP draft, four parallel slots |
 | `qwen36-fable-q4-mtp` | 262,144 | Fable Fusion embedded MTP plus multimodal projector |
 | `qwen38-flash-next-q4` | 262,144 | Qwen3.8 Flash Next UD-IQ4_XS with Q8 MTP=3, lazy PLE, and multimodal projector |
+| `qwen38-sc117-iq3s-tp2-mtp` | 262,144 per slot × 3 | SC117 IQ3_S, two Sparks over NCCL, FP16 KV, fully resident weights, Q4_0 MTP=4 |
 | `qwythos` | 131,072 | Qwythos 9B embedded MTP |
 
 ## Commands

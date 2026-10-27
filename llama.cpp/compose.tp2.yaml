@@ -1,0 +1,91 @@
+# spark1: dgx-model manages API + local worker. spark2: explicitly start rpc.
+name: dgx-llamacpp
+
+x-rpc-runtime: &rpc-runtime
+  build:
+    context: .
+    dockerfile: Dockerfile.rpc-nccl
+    additional_contexts:
+      nccl: "${HOME:?HOME is required}/nccl/build"
+    args:
+      LLAMA_COMMIT: d7a695ef679138c13d86359b84c1731d36213d32
+  image: dgx-llamacpp:cuda13-rpc-nccl-d7a695ef6791-v1
+  platform: linux/arm64
+  init: true
+  ipc: host
+  network_mode: host
+  gpus: all
+  restart: unless-stopped
+  environment: &nccl-environment
+    NCCL_SOCKET_IFNAME: enp1s0f0np0
+    NCCL_IB_HCA: rocep1s0f0,roceP2p1s0f0
+    NCCL_NET: IB
+    NCCL_DEBUG: INFO
+  devices:
+    - /dev/infiniband/rdma_cm
+    - /dev/infiniband/uverbs0
+    - /dev/infiniband/uverbs1
+    - /dev/infiniband/uverbs2
+    - /dev/infiniband/uverbs3
+  ulimits:
+    memlock: {soft: -1, hard: -1}
+    core: {soft: 0, hard: 0}
+  stop_grace_period: 2m
+  logging:
+    driver: json-file
+    options: {max-size: 20m, max-file: "3"}
+
+services:
+  llamacpp:
+    <<: *rpc-runtime
+    container_name: dgx-llamacpp
+    depends_on:
+      rpc-local:
+        condition: service_healthy
+    entrypoint: [/bin/bash, /config/launch.sh]
+    command: ["${LLAMA_PROFILE:-qwen38-sc117-iq3s-tp2-mtp}"]
+    volumes:
+      - "${HOME:?HOME is required}/models/gguf:/models:ro"
+      - ./launch.sh:/config/launch.sh:ro
+      - ./profiles:/config/profiles:ro
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --show-error, --max-time, "5", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 6s
+      start_period: 10m
+      retries: 6
+
+  rpc-local:
+    <<: *rpc-runtime
+    container_name: dgx-llamacpp-rpc-local
+    entrypoint: [/app/ggml-rpc-server]
+    command: [--host, "192.168.100.10", --port, "50052", --device, CUDA0, --cache]
+    environment:
+      <<: *nccl-environment
+      LLAMA_CACHE: /cache
+    volumes:
+      - rpc-cache:/cache
+    healthcheck:
+      # Inspect the listening socket without opening a second RPC connection.
+      test: [CMD-SHELL, "grep -q '0A64A8C0:C384 .* 0A ' /proc/net/tcp"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 12
+
+  rpc:
+    <<: *rpc-runtime
+    profiles: [rpc]
+    container_name: dgx-llamacpp-rpc
+    entrypoint: [/app/ggml-rpc-server]
+    # Bind only to spark2's dedicated link, not the API/LAN interface.
+    command: [--host, "192.168.100.11", --port, "50052", --device, CUDA0, --cache]
+    environment:
+      <<: *nccl-environment
+      LLAMA_CACHE: /cache
+    volumes:
+      - rpc-cache:/cache
+
+volumes:
+  rpc-cache:
+    name: dgx-llamacpp-rpc-cache

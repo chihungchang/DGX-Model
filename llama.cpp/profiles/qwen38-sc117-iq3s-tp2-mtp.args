@@ -1,0 +1,72 @@
+# SC117 abliterated GSQ-RCO IQ3_S, two DGX Sparks, tensor parallel + MTP.
+# Three 256K slots; the 2026-10-07 speed comparison used one slot (see ../TP2.md).
+# Target: RPC0 on spark1 + RPC1 on spark2; NCCL uses both ConnectX-7 interfaces.
+# Start the matching remote RPC worker first; dgx-model starts the local worker.
+# llama-compose: compose.tp2.yaml
+# hf-model: SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF
+# hf-revision-id: eec4e10a2c29b440a2ae85591fa11569ce752963
+# model-url: https://huggingface.co/SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF/resolve/eec4e10a2c29b440a2ae85591fa11569ce752963/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_S-00001-of-00002.gguf
+# model-sha256: 40f369eca301ec6ea318dbb671b3132c26a2f0b89aa5458a7051b33215ee296c
+# artifact: gguf /models/SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_S-00002-of-00002.gguf https://huggingface.co/SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF/resolve/eec4e10a2c29b440a2ae85591fa11569ce752963/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_S-00002-of-00002.gguf 316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113
+# draft-model-url: https://huggingface.co/ggml-org/Qwen3.8-Flash-Next-GGUF/resolve/052beeaca7bec4a303e59cc7bc630c4f3a1b845d/mtp-Qwen3.8-Flash-Next-Q4_0.gguf
+# draft-model-sha256: d484e6e541a36b714976f72f7d1a86ae2cc450cff110b81e3656512784abd1c6
+--model
+/models/SC117/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_S-00001-of-00002.gguf
+--alias
+qwen3.8-flash-next-sc117-iq3s
+--host
+0.0.0.0
+--port
+8080
+--rpc
+192.168.100.10:50052,192.168.100.11:50052
+--device
+RPC0,RPC1
+--split-mode
+tensor
+--tensor-split
+1,1
+--n-gpu-layers
+all
+# Total context allocation: 3 slots x 262144 tokens, preserving 256K per request.
+--ctx-size
+786432
+--parallel
+3
+# FP16 KV improved this 32K workload; model weight quantization remains IQ3_S.
+--cache-type-k
+f16
+--cache-type-v
+f16
+--spec-draft-model
+/models/ggml-org/Qwen3.8-Flash-Next-GGUF/mtp-Qwen3.8-Flash-Next-Q4_0.gguf
+--spec-type
+draft-mtp
+--spec-draft-n-max
+4
+--spec-draft-ngl
+all
+# Keep the small draft on spark1; only the target uses TP=2.
+--spec-draft-device
+CUDA0
+--fit
+off
+# Preload weights; lock host buffers so PLE stays resident rather than demand-read.
+--load-mode
+mlock
+--lazy-mode
+off
+--verbosity
+4
+--flash-attn
+on
+# Avoid the RPC prompt-cache save path until validated on this deployment.
+--cache-ram
+0
+--cont-batching
+--jinja
+--metrics
+--batch-size
+2048
+--ubatch-size
+512

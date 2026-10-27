@@ -1,0 +1,68 @@
+# Source build for TP across RPC workers using NCCL over ConnectX-7.
+# The existing Unsloth image remains the default for single-node profiles.
+ARG LLAMA_COMMIT=d7a695ef679138c13d86359b84c1731d36213d32
+FROM nvidia/cuda:13.0.0-devel-ubuntu24.04 AS build
+
+ARG LLAMA_COMMIT
+ARG BUILD_JOBS=4
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        build-essential ca-certificates cmake git libibverbs-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src/llama.cpp
+RUN git init \
+    && git remote add origin https://github.com/ggml-org/llama.cpp.git \
+    && git fetch --depth 1 origin "${LLAMA_COMMIT}" \
+    && git checkout --detach FETCH_HEAD \
+    && test "$(git rev-parse HEAD)" = "${LLAMA_COMMIT}"
+
+# Supply the NCCL build already validated with nccl-tests on both Sparks.
+COPY --from=nccl include/nccl.h /opt/nccl/include/nccl.h
+COPY --from=nccl lib/libnccl.so.2.30.7 /opt/nccl/lib/libnccl.so.2.30.7
+RUN echo '1447f19c849c9a9f0f7ff2fd1ad2631e84a7ac2fb65cbe52102324c28a591997  /opt/nccl/include/nccl.h' | sha256sum -c - \
+    && echo 'd1d87caa45dbd8bebef5608457189f00f22a340656c8e4d0defd79b252a94ac1  /opt/nccl/lib/libnccl.so.2.30.7' | sha256sum -c - \
+    && ln -s libnccl.so.2.30.7 /opt/nccl/lib/libnccl.so.2 \
+    && ln -s libnccl.so.2 /opt/nccl/lib/libnccl.so
+
+# PR 26610 at f6ae027e + NCCL-only changes from PR 28967 at a50c8f78.
+# Both remain upstream proposals; all API/worker processes must use this image.
+COPY patches/rpc-nccl-collectives.patch /tmp/rpc-nccl-collectives.patch
+RUN git apply --check /tmp/rpc-nccl-collectives.patch \
+    && git apply /tmp/rpc-nccl-collectives.patch
+
+RUN cmake -S . -B build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CUDA_ARCHITECTURES=121a-real \
+        -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
+        -DGGML_NATIVE=OFF \
+        -DGGML_BACKEND_DL=ON \
+        -DGGML_CUDA=ON \
+        -DGGML_CUDA_NCCL=ON \
+        -DNCCL_ROOT=/opt/nccl \
+        -DGGML_RPC=ON \
+        -DGGML_RPC_RDMA=ON \
+        -DLLAMA_BUILD_TESTS=OFF \
+        -DLLAMA_BUILD_EXAMPLES=OFF \
+        -DLLAMA_BUILD_APP=OFF \
+    && cmake --build build --config Release --parallel "${BUILD_JOBS}" \
+        --target llama-server ggml-rpc-server
+
+FROM nvidia/cuda:13.0.0-runtime-ubuntu24.04
+ARG LLAMA_COMMIT
+LABEL org.opencontainers.image.source="https://github.com/ggml-org/llama.cpp" \
+      org.opencontainers.image.revision="${LLAMA_COMMIT}" \
+      local.dgx.patch="rpc-nccl-collectives-v1"
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates curl ibverbs-providers libibverbs1 libgomp1 libssl3t64 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /src/llama.cpp/build/bin/ /app/
+COPY --from=build /opt/nccl/lib/libnccl.so.2.30.7 /app/
+RUN ln -s libnccl.so.2.30.7 /app/libnccl.so.2
+ENV LD_LIBRARY_PATH=/app
+WORKDIR /app
+RUN /app/llama-server --version && /app/ggml-rpc-server --help

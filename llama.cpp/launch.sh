@@ -54,6 +54,16 @@ for flag in --spec-draft-model --model-draft --draft-model --mmproj; do
   validate_model_file "$flag" "$artifact_path"
 done
 
+# Split GGUF siblings are metadata artifacts, not llama-server arguments.
+while read -r marker label kind artifact_path source checksum extra; do
+  [[ "$marker" == '#' && "$label" == artifact: ]] || continue
+  [[ -n "$kind" && -n "$source" && -n "$checksum" && -z "$extra" ]] || {
+    printf 'Malformed artifact metadata in %s\n' "$profile_file" >&2
+    exit 64
+  }
+  validate_model_file "$kind" "$artifact_path"
+done < "$profile_file"
+
 printf 'Starting llama.cpp: profile=%s model=%s\n' "$profile" "$model_path"
 
 exec /app/llama-server "${profile_args[@]}"

@@ -150,6 +150,7 @@ implementation; text requests retain the fused path. See
 | `qwen36-27b-q4` | Qwen3.6 27B Q4_K_M without speculative decoding |
 | `qwen36-fable-q4-mtp` | Fable Fusion with embedded MTP and multimodal projector |
 | `qwen38-flash-next-q4` | Qwen3.8 Flash Next UD-IQ4_XS with Q8 MTP=3, lazy PLE, and multimodal projector |
+| `qwen38-sc117-iq3s-tp2-mtp` | SC117 IQ3_S, NCCL TP2 and Q4_0 MTP=4; [preparation and activation](llama.cpp/TP2.md) |
 | `qwythos` | Qwythos 9B with embedded MTP |
 
 ### TensorFold on two Sparks

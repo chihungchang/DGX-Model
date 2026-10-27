@@ -428,7 +428,7 @@ compose_for() {
   local engine="$1"
   local profile="$2"
   shift 2
-  local directory compose_file profile_env profile_file image_override
+  local directory compose_file profile_env profile_file image_override compose_override
   local -a environment
 
   directory="$(engine_dir "$engine")"
@@ -467,6 +467,18 @@ compose_for() {
         environment[${#environment[@]}-1]="SGLANG_BASE_IMAGE=$image_override"
       fi
     fi
+  elif [[ "$engine" == llamacpp ]]; then
+    # The remote RPC worker must be started explicitly on spark2.
+    environment+=("COMPOSE_PROFILES=")
+    profile_file="$directory/profiles/${profile}.args"
+    if [[ -r "$profile_file" ]]; then
+      compose_override="$(metadata_value llama-compose "$profile_file")"
+      case "$compose_override" in
+        "") ;;
+        compose.tp2.yaml) compose_file="$directory/$compose_override" ;;
+        *) die 64 "Unsupported llama.cpp Compose configuration in $profile_file: $compose_override" ;;
+      esac
+    fi
   fi
   env "${environment[@]}" docker compose \
     --project-directory "$directory" \
@@ -491,7 +503,7 @@ require_configured_image() {
     case "$engine" in
       vllm) die 66 "Container image is missing. Run: ./dgx-model image pull vllm $profile" ;;
       sglang) die 66 "Container image is missing. Run: ./dgx-model image build sglang $profile" ;;
-      llamacpp) die 66 "Container image is missing. Run: ./dgx-model image build llamacpp" ;;
+      llamacpp) die 66 "Container image is missing. Run: ./dgx-model image build llamacpp $profile" ;;
     esac
   fi
 }
