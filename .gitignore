@@ -80,3 +80,4 @@ __pycache__/
 /tensorfold/.state/
 /tensorfold/node*.env
 /tensorfold/vendor/deepseek-v41/.env
+/tensorfold/native/runtime/

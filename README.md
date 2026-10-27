@@ -155,19 +155,18 @@ implementation; text requests retain the fused path. See
 
 ### TensorFold on two Sparks
 
-The pinned `deepseek-v41-flash-1017-exl3-tp2` profile uses
-`LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw`, its matching 1017
-Engram tables, and the DeepSeek TP2 TensorFold fork. It serves text and image
+The active `deepseek-v41-flash-1017-blackfold-exl3-native-tp2` profile uses
+`BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2`, its matching 1017
+Engram tables, and the native DeepSeek TP2 TensorFold engine. It serves text and image
 requests with a 262,144-token limit per request, including image tokens and
 the reply, and four concurrent requests on port 8080. Shared KV storage has
-1,114,112 token positions. Images may use base64 data URLs or HTTP(S) URLs.
-Prepare both nodes and switch engines from spark1:
+1,245,184 token positions. Images may use base64 data URLs or public HTTPS URLs.
+The original LibertAI weights were replaced to free disk space. SGLang remains
+available for rollback. Manage the installed model and switch engines from spark1:
 
 ```bash
-./dgx-model image build tensorfold deepseek-v41-flash-1017-exl3-tp2
-python3 scripts/dgx_model_cluster.py extensions tensorfold
-./dgx-model model pull tensorfold deepseek-v41-flash-1017-exl3-tp2
-./dgx-model use tensorfold deepseek-v41-flash-1017-exl3-tp2
+./dgx-model validate tensorfold deepseek-v41-flash-1017-blackfold-exl3-native-tp2
+./dgx-model use tensorfold deepseek-v41-flash-1017-blackfold-exl3-native-tp2
 ./dgx-model smoke tensorfold
 
 # Return to the existing SGLang configuration on both nodes.

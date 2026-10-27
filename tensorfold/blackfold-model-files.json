@@ -1,0 +1,757 @@
+{
+  "files": [
+    {
+      "path": "model/config.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "config.json",
+      "size": 3628,
+      "sha256": "eb48f2216645b36f400036fa2d67d8ad6b48233b0f4a1bcb7e99fa6450dad253",
+      "git_blob": "136a40c7ed455dc4e385aaf713445259878ad022"
+    },
+    {
+      "path": "model/encoding/tests/test_input_1.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "encoding/tests/test_input_1.json",
+      "size": 2761,
+      "sha256": "6a5a86694e47169c8f0c9243a7e24cc5db05447be0d3d3a9891034e913c518de",
+      "git_blob": "c7435727e24c5f7b5cf28b470cf03814101eb37a"
+    },
+    {
+      "path": "model/encoding/tests/test_input_2.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "encoding/tests/test_input_2.json",
+      "size": 527,
+      "sha256": "fd985cda88e8640b8e2404d8e659f7006cad204eb41f73c9e6662b1f218c01aa",
+      "git_blob": "132bb05a51e79204324f160cfde2880b5d0077ba"
+    },
+    {
+      "path": "model/encoding/tests/test_input_3.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "encoding/tests/test_input_3.json",
+      "size": 2554,
+      "sha256": "4207613f15c79b95ad92074bdb8b2b81c5ce9cfdf15b7a67f58ded6bb3ec4fa5",
+      "git_blob": "6d2612113c71fb9a897255ec694b7b8a41d0432b"
+    },
+    {
+      "path": "model/encoding/tests/test_input_4.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "encoding/tests/test_input_4.json",
+      "size": 712,
+      "sha256": "4c3890a7bc042ec6396d98d024a39a73cdcffbe1d0253e852da0c35e65296f3e",
+      "git_blob": "86cd1f0a68075a412654ea10f9558c69162b271a"
+    },
+    {
+      "path": "model/encoding/tests/test_input_5.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "encoding/tests/test_input_5.json",
+      "size": 1143,
+      "sha256": "88289b0aac8d650aa55c4ffeb392818fff3a0ac83c2293ddfd90546804d5e5c4",
+      "git_blob": "2a2fa6a89e8118e896ec47abcc5bda30789e6532"
+    },
+    {
+      "path": "model/exl3_k_map.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "exl3_k_map.json",
+      "size": 1409,
+      "sha256": "4359af687bdce7fccd4fc74a57c2f9154b42053447cdc6e0d1768e68fffbec0f",
+      "git_blob": "f05a045d5221b789a7bd7edb2e129343c4d3a080"
+    },
+    {
+      "path": "model/model-00001-of-00043.safetensors",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "model-00001-of-00043.safetensors",
+      "size": 1323827293,
+      "sha256": "ba5ccb4d39882d08800e856150bce42b23584f3d9943520ae4cff5647d5a3045",
+      "git_blob": "a74fb50a8187429fc6030a3367d7ecc5ecdbdc0f"
+    },
+    {
+      "path": "model/model-00002-of-00043.safetensors",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "model-00002-of-00043.safetensors",
+      "size": 5322748742,
+      "sha256": "11ed8a0cb267169a5f3ea0ceebb24ab09fb5b84b98e4d4c86dc2f06f1f5e0d40",
+      "git_blob": "b4dd1ec65b17d71f1079a77da86b091456971609"
+    },
+    {
+      "path": "model/model-00003-of-00043.safetensors",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "model-00003-of-00043.safetensors",
+      "size": 5223069939,
+      "sha256": "1de02ee6b4d909eb5936e08e7c3825cbf2fa65693c5674deade2e70bcb773462",
+      "git_blob": "3e1e2b17e37c395f40831246295b013473197e91"
+    },
+    {
+      "path": "model/model-00004-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00004-of-00043.safetensors",
+      "size": 5230038140,
+      "sha256": "1eb93c1cdd1d01ddb76d5c8b8244cfe4e20ec1738803d85beacfd37bfe8df3e0",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "8e68a9e396d958d6645378b44ef3419a4c0b743da0e92b354d2163a4c8bf85ce"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00005-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00005-of-00043.safetensors",
+      "size": 5223053460,
+      "sha256": "1bfbf05b72b419c7fc6494b9645b51325dc483086561c1277a0b58ba21f389a6",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "c14a66ba26f57e9577e1a656764b3e5828e09c7630ad7404b80c6e265d03a37d"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00006-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00006-of-00043.safetensors",
+      "size": 5223053460,
+      "sha256": "e5f65e75ff46754fc5db417baf01aa564a7cbf5b75483fbb2d576292fb2d9c3c",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "2866602c20b535eec3bb1a737f62d5d6d2dfecbf362977d3a4f5f8e701580b6d"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00007-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00007-of-00043.safetensors",
+      "size": 5223053460,
+      "sha256": "f069482c4d20f4bd351640f9592baccfa22fc5ece217e9c65f52dbe6b1aaadd4",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "4d12814cd25cf07fe9c6791f0050a8afbc1038bae02fb201243f9c56de8171cd"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00008-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00008-of-00043.safetensors",
+      "size": 5223053460,
+      "sha256": "d41565111487a26209c3113e03617d42e5d6c68314a6865eb7808d71cdfe9d4b",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "cb88f50d0ddd81b98db00a6475c356511c3c21f843b2ccd9845fb4017c3f5d15"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00009-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00009-of-00043.safetensors",
+      "size": 5223053460,
+      "sha256": "0260266c2ba4a1adcea0536d2523ae18d86c7176bfc7bbeb21396f8e41bac064",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "dbebd82073a27f79dd1353d3c309255f46e577eb1c2f9d8a10a52bc38f6d8bc2"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00010-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00010-of-00043.safetensors",
+      "size": 5230038140,
+      "sha256": "f61745aaefb39a813da980a6aeff9f1c525e6e16c7a002465e42707f0f263763",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "8cde4e4124614502c2950e9f3a643027eceeeedbdf3c54cf786dbf125d3d536e"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00011-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00011-of-00043.safetensors",
+      "size": 5223053460,
+      "sha256": "135cfd67542850319aa39b60884521fcf3c4e87ea5c2a08b4cfd90043127e970",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "c96372d73271d2c59e5a959bb81551aaacb2abe8445f5b9ea9391e2b4a033601"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00012-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00012-of-00043.safetensors",
+      "size": 5223058140,
+      "sha256": "04c4d736f9a3b8b9e314dfdba6c5657fc1e78b877ef53c7a5f65885e22c6728b",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "337345b1ca174aebcff619bbc2c2a6e33881a42ad8f638956e69b5de4fe21d41"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00013-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00013-of-00043.safetensors",
+      "size": 5218634460,
+      "sha256": "672fa64c8ac77d50916a4ca4ebfd4d71b86a91414cca235e1637c218304b07f7",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "042b4274c48e55d09bfe51ac099915f8bc3bb0c7be9b0f9d5e75a9f5c2045497"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00014-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00014-of-00043.safetensors",
+      "size": 5218634460,
+      "sha256": "b1014612620ef160658ec6d396b66bfc60c3a8579057c0b2fdbcc08fb8de6d82",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "bc27a27e60bebd88ad36f4896aa027911bc5f7fbb30ad9a25f95a59a6374d957"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00015-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00015-of-00043.safetensors",
+      "size": 5297505608,
+      "sha256": "82ad7f73d96f423641480ba25b36358f329265a73c494520037a7f86bd048621",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "74d3f0d12e32a658d8f6c5f9a104826e473c53299267519b46d594619756ae66"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00016-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00016-of-00043.safetensors",
+      "size": 5225619164,
+      "sha256": "cbeaadb7f2629d71fda247042d1693766b904a7aa995b55bd85c13cf525b88c3",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "0a1b0b3ecb817f448d9fb34ebf0757d4b00042220515ecb13f1b86908cb092f3"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00017-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00017-of-00043.safetensors",
+      "size": 5218634460,
+      "sha256": "e709635e34913cd6483faf2c2e79387db52409a8b23d5439f682bde66977e908",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "e4b4278a51ce9daf61290d4caba5b953f5a243832ffb5c8d29a0c259807facea"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00018-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00018-of-00043.safetensors",
+      "size": 5218634460,
+      "sha256": "9a81e94640ef9f0e0778d22c1307e54e62c9c5332e00de8cf0f9d476d03913ea",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "07e9d048f9cefb94b9a30f41e39b9390b6bf54a763c0b7e1dcd5d81144fc0849"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00019-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00019-of-00043.safetensors",
+      "size": 5218634460,
+      "sha256": "1c62c5412a2ccdd95d935e79a2d868d06219ea3b166815bdc83bac3e8e432eb8",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "2c6116ee6f584af8c4027cee8f5069d0d51a4e9b487dd73027127d29f4caf274"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00020-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00020-of-00043.safetensors",
+      "size": 3519941140,
+      "sha256": "ba019212d3703b7a0eb0cb976e6979a1ba32cd68eddc929e06761d32fa52f8b0",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "817d948752825a739073b95bc6171a35e4677c095ac617bd6772560ae0e4b5e4"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00021-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00021-of-00043.safetensors",
+      "size": 3519941140,
+      "sha256": "348ca0ba90e4674cc94eab487fa6849fc55abd82dce20e359b601def38dc81c3",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "4bdda16b5a00ac5ee0e39bc81271af6155caacb7c03928876b07344e20a4ba5f"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00022-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00022-of-00043.safetensors",
+      "size": 3525275752,
+      "sha256": "baeaed4b84ba3d4c11a15dbec940651ed880d2f25272f4e01409126c4a980558",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "00afb7bd831cd50added9b809cc2e9cec57ab44963f152f8bc42cd6d22f0a4e4"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00023-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00023-of-00043.safetensors",
+      "size": 3519941140,
+      "sha256": "9d558e157cbbbe069e8e21b85ae7389c7dc32857a9dae076bce223b368fb01fe",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "28ba9d401e2cd556d0145b31c03ed341f009e2849162e6d9f68438a067d74a59"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00024-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00024-of-00043.safetensors",
+      "size": 3519941140,
+      "sha256": "a7de7678a6aedcfebc1fa45c215be2aa24c0f125b913c34afd1b2b933d04b023",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "1240d8744902914287da94cd8e2a5d9f17e7c39167bfab20c737a34d7605e50c"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00025-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00025-of-00043.safetensors",
+      "size": 5218634460,
+      "sha256": "18f7be8319386c279502f00f95677d35d5e0e61d349bfadf58ad2671b54fdf7a",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "a053c3dc54c4ecfe295cfa4bd7fb44f1054ade1d596e46496f6791c87ffb60df"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00026-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00026-of-00043.safetensors",
+      "size": 5222250304,
+      "sha256": "d46b2eb6983474888181afb7fee21a29732ea988c9a117b5bc69e2cbcfa46ee7",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "028c44abbea066c94da7ed0e64f07f8d36ae925a4ff437ef999f5a2b5ec6c9d4"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00027-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00027-of-00043.safetensors",
+      "size": 5218634460,
+      "sha256": "0e392d264688fb2d1b7bd3aa8b147cfff3dcc30302eea414b29d3aba479704f9",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "69cbb8f2f00ddcb7a83b04d34ca9151c61f3319ec742d0ac5f06abf295a91eef"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00028-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00028-of-00043.safetensors",
+      "size": 5218634460,
+      "sha256": "3fcf953546983eda8d6e6954f7f04b22f22ecad9d91626eeefebaa15598d91ad",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "451c69700eb30a9e47ec80fe219aa537985c6afa3f7391db5699fba50d93e05b"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00029-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00029-of-00043.safetensors",
+      "size": 5218634460,
+      "sha256": "b61dd70417d3dd2d92de17dab59de97ea4b7b897f5a96d49b9caa886f45f021f",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "906a9525cde8176d18066d27ae9d457ff55ee3134438dadea4ee63af8dce45ad"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00030-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00030-of-00043.safetensors",
+      "size": 5222250304,
+      "sha256": "482f7f104b9cbea1baec11099bc5c431990da3997bfcaac83edb4891e31801ae",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "420ad929c1efa3f90ba4a39d28159d9a29175089cd9bd4fe32f25c6fb7e473f6"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00031-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00031-of-00043.safetensors",
+      "size": 5220109020,
+      "sha256": "772aefe0d17893c7034509385cc1d66180b5b2c974f2b89005cbdbf1707d92ce",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "0312eb9c04dbe5f538efd94a21d1f76266a8cac9ea01250084aa6513657fc5df"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00032-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00032-of-00043.safetensors",
+      "size": 5223058140,
+      "sha256": "f0c7fc2b28c9f0c3e2d3cb2fc0a63f46ea683d6a6623e98ba75623f03e30e8e2",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "4653d193e28120319fe5b3508ffed537d23f57b8d31b20f3f69371fd569e59b2"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00033-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00033-of-00043.safetensors",
+      "size": 5223058140,
+      "sha256": "27091dabdcb81828298f591d1bb2f8170381f1764d65aef40b600154301c433a",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "3a6bfc60065324e606082ae8ad68ff403285b24e7a720b3b2274e516a247252a"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00034-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00034-of-00043.safetensors",
+      "size": 5226673984,
+      "sha256": "63eafdbacaf56ed709dfc2edd3dedc3697bbc710ae1f26339a6cf294135a3d34",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "b1825ddd7016d3cefea0f13ec78aff33637c68e0eb721cdb12f83104c03b3760"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00035-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00035-of-00043.safetensors",
+      "size": 5223058140,
+      "sha256": "3c269bb77912dcaa2aefa3a70e87e7ab1684bcc5d978fef976590a6bad8a338d",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "9b513ca99a0e8403d172df623a4c0fe7ecaaa51e09015d9574efa90bd6414a32"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00036-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00036-of-00043.safetensors",
+      "size": 5223058140,
+      "sha256": "f309e1b88a731a984a6da29dd8fbd3136296814434c03f41a147bfaedb371168",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "206ca962082e2c4de968ba4cc82cc1837dccb0b8960f493e04891b281bbfe497"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00037-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00037-of-00043.safetensors",
+      "size": 5223058140,
+      "sha256": "681556aa24272afabd40993b91c3b03d767fbec82cf6830d1fd5f634bf30e429",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "6ed69fdcd3bd32762ddefae671c7fce7f9b5a212cdbe1aaee64adaa5ef0eef2c"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00038-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00038-of-00043.safetensors",
+      "size": 5226673984,
+      "sha256": "0205a37163cb7fa869023317166d6042f339c7ae28cbe07b6d373ccb602548f7",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "24a61b540656dc210b3bc3215b1713f0b4bee8b724176a4f5968e24b9540035c"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00039-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00039-of-00043.safetensors",
+      "size": 5223058140,
+      "sha256": "b1bd2dfd808974bf9649ffd8155d9121af2f28e54e6d18576d9aeace4768c37d",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "29e5b40a97edcb91ed6a382b39bbb4d16ce40de2d1ddce2f75a8fd75e0ad609f"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00040-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00040-of-00043.safetensors",
+      "size": 5223058140,
+      "sha256": "594373c895eab325c5e0c4699c8ab8416a33b0cca28a9cdea1996908b4953f10",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "5c850a3950ce68a93a24336ccc417ac660fdbdb84bcc494aa6d57ea5c28246be"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00041-of-00043.safetensors",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+      "filename": "model-00041-of-00043.safetensors",
+      "size": 5719773096,
+      "sha256": "acddb0af52171cc8b5f3ac3485fd050a7dc54dd7ad4a29885bbb1bdad02e7cd1",
+      "derived_from": {
+        "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+        "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+        "sha256": "5a6f5791d3f5f9635e58db5a693f68c64c6c9e14357e8386a21e5fd232af032d"
+      },
+      "derivation": "official BLACKFOLD apply_overlay.py"
+    },
+    {
+      "path": "model/model-00042-of-00043.safetensors",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "model-00042-of-00043.safetensors",
+      "size": 4854649316,
+      "sha256": "2f80f4a44e4608c6da139eccf2483122ac88a240046872965d546b4fa26ded06",
+      "git_blob": "98eb0df005941d3996773749e08b5e6bb5a8f425"
+    },
+    {
+      "path": "model/model-00043-of-00043.safetensors",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "model-00043-of-00043.safetensors",
+      "size": 3500776125,
+      "sha256": "c5b94d519d323921baacb34b6111e518ce2c36309d06c80fe4e42e3aa9662bc5",
+      "git_blob": "58fb53015708437b5dbdefd12295c29acf8d741b"
+    },
+    {
+      "path": "model/model.safetensors.index.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "model.safetensors.index.json",
+      "size": 15504210,
+      "sha256": "778baeaf9fbcd351800536dc090ff1edddb72d102472b08de0edd9a52cb96656",
+      "git_blob": "adc42e1787824069a907f07b9fffd72a51e0dbf5"
+    },
+    {
+      "path": "model/quantization_config.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "quantization_config.json",
+      "size": 54653012,
+      "sha256": "696cdad521cdebea0642a3c22d01c9152dca4e5ccbf209b5e7f2b808f359bd27",
+      "git_blob": "a1b607d535bbfaeb52e7cb1fc2ac3493ce1db836"
+    },
+    {
+      "path": "model/tokenizer.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "tokenizer.json",
+      "size": 6367257,
+      "sha256": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+      "git_blob": "6a15814dd25c934028034531da744c689f87ff21"
+    },
+    {
+      "path": "model/tokenizer_config.json",
+      "repo_id": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw",
+      "revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+      "filename": "tokenizer_config.json",
+      "size": 801,
+      "sha256": "6ac8c8dc065ed118161d02dd532749ae3f52c243deac27872134fae2f50d8547",
+      "git_blob": "f3dad388a2bbfd6a8605bd02754acd86d9ca5112"
+    },
+    {
+      "path": "engram/config.json",
+      "repo_id": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+      "revision": "1bae0e1088993b9b82de08f59de5be5a34e42170",
+      "filename": "config.json",
+      "size": 3311,
+      "sha256": "8be45ce0476004a3f529fd896115a4a2e800a129ad2d3ec05b16050f52e21879",
+      "git_blob": "09917a9139b22d5bf8be52132787f435147b1020"
+    },
+    {
+      "path": "engram/model-00047-of-00048.safetensors",
+      "repo_id": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+      "revision": "1bae0e1088993b9b82de08f59de5be5a34e42170",
+      "filename": "model-00047-of-00048.safetensors",
+      "size": 101535150936,
+      "sha256": "76a05106ece259be83d1bfea0dcb54f23377864ee60fd321690f35e6698a2af5",
+      "git_blob": "3f7da18bffaa6548ee2ad862a71982acc4bff661"
+    },
+    {
+      "path": "engram/model-00048-of-00048.safetensors",
+      "repo_id": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+      "revision": "1bae0e1088993b9b82de08f59de5be5a34e42170",
+      "filename": "model-00048-of-00048.safetensors",
+      "size": 101537926640,
+      "sha256": "9dc51433e195bc78b5ad846b68643cc0351d3b174e5e4309222d3b7402c83afd",
+      "git_blob": "069c1abaff855ad203fdb2ef5f3cc60505afb292"
+    },
+    {
+      "path": "engram/model.safetensors.index.json",
+      "repo_id": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+      "revision": "1bae0e1088993b9b82de08f59de5be5a34e42170",
+      "filename": "model.safetensors.index.json",
+      "size": 7470294,
+      "sha256": "74b0686a3d2891980d5e303251b075a3bccae2c2ff650747db2620a649b98fa8",
+      "git_blob": "54c85064dd92c8550471302e9ae59bedbbf96ca4"
+    },
+    {
+      "path": "model/BLACKFOLD_GRAFT_META.json",
+      "size": 966,
+      "sha256": "2b6d3a7766bae8e22ea43ac26d949c33f1a7b095894692838c7064e9fb469db6",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295"
+    },
+    {
+      "path": "model/BLACKFOLD_SHA256SUMS",
+      "size": 4673,
+      "sha256": "e821f2b3525ed7c64e682d630674dd18b61c6002a6e184fed0643671908bb40a",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295"
+    },
+    {
+      "path": "model/BLACKFOLD_stock_shards.sha256",
+      "size": 4257,
+      "sha256": "56ba82a9bfa0a6c6cc5a94abb757fea4929277a33c96fc4c89ef8f2f73a39503",
+      "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+      "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295"
+    }
+  ],
+  "omitted_optional_source_metadata": [
+    "model/.gitattributes",
+    "model/LICENSE",
+    "model/README.md",
+    "model/encoding/README.md",
+    "model/encoding/encoding.py",
+    "model/encoding/test_encoding.py",
+    "model/encoding/tests/test_output_1.txt",
+    "model/encoding/tests/test_output_2.txt",
+    "model/encoding/tests/test_output_3.txt",
+    "model/encoding/tests/test_output_4.txt",
+    "model/encoding/tests/test_output_5.txt"
+  ],
+  "repo_id": "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2",
+  "revision": "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295",
+  "overlay_sha256": "f42912922985684e7a0cd8f3f6d73efafec620399e8100f09cfdb0ab67b0e649",
+  "base_revision": "afc7aa0aab98ee735c0f54e0a122019af1ac08f1",
+  "assembly": "official apply_overlay.py --inplace; all 43 output hashes verified",
+  "original_manifest": "model-files.json",
+  "replaced_stock_model": true
+}

@@ -5,6 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import struct
 import tempfile
 import unittest
 from unittest import mock
@@ -17,6 +18,97 @@ SPEC.loader.exec_module(cluster)
 
 
 class ClusterSwitchTests(unittest.TestCase):
+    def test_blackfold_uses_native_with_separate_weights_and_cache(self):
+        profile = cluster.TF_BLACKFOLD_PROFILE
+        self.assertTrue(cluster.native_profile(profile))
+        self.assertNotEqual(cluster.model_view(profile), cluster.MODEL_VIEW)
+        self.assertNotEqual(cluster.cache_dir(profile), cluster.CACHE)
+        with mock.patch.object(cluster, "run") as run, mock.patch.object(cluster, "wait_ready"):
+            cluster.start_tensorfold(profile)
+        self.assertEqual([c.args[1] for c in run.call_args_list], [1, 0])
+        for call in run.call_args_list:
+            self.assertIn(cluster.ROOT / "tensorfold/compose.native.yaml", call.args[0])
+            self.assertTrue(any(str(x).endswith("-blackfold.env") for x in call.args[0]))
+
+    def test_blackfold_refuses_stock_or_unbound_cache_receipts(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runtime = root / "tensorfold/native/runtime"
+            runtime.mkdir(parents=True)
+            files = []
+            for i in range(370):
+                name = f"kit-{i}"
+                (runtime / name).write_bytes(b"fixture")
+                files.append({"path": name, "size": 7,
+                              "sha256": hashlib.sha256(b"fixture").hexdigest()})
+            (runtime / "build.json").write_text(json.dumps({
+                "engine_commit": cluster.TF_NATIVE_COMMIT, "patches": {}, "files": files}))
+            cache = root / "cache"
+            (cache / "tf-ds-rank").mkdir(parents=True)
+            name = "rank0of2-fixture.bin"
+            (cache / "tf-ds-rank" / name).write_bytes(struct.pack("<Q", 0) + b"TFDSRK01")
+            (cache / "dsv41-token-map.json").write_text("{}")
+            marker = cache / "blackfold-model.json"
+            receipt = {"repo_id": cluster.BLACKFOLD_ID, "revision": cluster.BLACKFOLD_REVISION,
+                       "overlay_sha256": cluster.BLACKFOLD_OVERLAY_SHA, "rank": 0,
+                       "cache_file": name, "cache_size": 16, "cache_index_offset": 0}
+            with mock.patch.object(cluster, "ROOT", root), \
+                 mock.patch.object(cluster, "BLACKFOLD_CACHE", cache):
+                self.assertIn("BLACKFOLD cache provenance mismatch",
+                              cluster.native_artifact_errors(0, cluster.TF_BLACKFOLD_PROFILE))
+                marker.write_text(json.dumps(receipt))
+                self.assertEqual(cluster.native_artifact_errors(0, cluster.TF_BLACKFOLD_PROFILE), [])
+                receipt["cache_file"] = "old-stock-cache.bin"
+                marker.write_text(json.dumps(receipt))
+                self.assertIn("BLACKFOLD cache receipt does not match file",
+                              cluster.native_artifact_errors(0, cluster.TF_BLACKFOLD_PROFILE))
+
+    def test_native_starts_both_ranks_with_its_own_compose(self):
+        with mock.patch.object(cluster, "run") as run, mock.patch.object(cluster, "wait_ready"):
+            cluster.start_tensorfold(cluster.TF_NATIVE_PROFILE)
+        commands = [c.args for c in run.call_args_list]
+        self.assertEqual(commands[0][1], 1)
+        self.assertEqual(commands[1][1], 0)
+        for command in commands:
+            self.assertIn(cluster.ROOT / "tensorfold/compose.native.yaml", command[0])
+
+    def test_switching_runtime_does_not_reuse_the_previous_live_server(self):
+        previous = {"State": {"Status": "running"}, "Config": {"Labels": {
+            "ai.dgx.profile": cluster.TF_PROFILE}}}
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(cluster, "STATE", Path(directory)), \
+             mock.patch.object(cluster, "validate"), \
+             mock.patch.object(cluster, "sync_config"), \
+             mock.patch.object(cluster, "active", side_effect=[True, False]), \
+             mock.patch.object(cluster, "inspect", return_value=previous), \
+             mock.patch.object(cluster, "memory", return_value=115), \
+             mock.patch.object(cluster, "stop_other_models"), \
+             mock.patch.object(cluster, "stop") as stop, \
+             mock.patch.object(cluster, "run"), \
+             mock.patch.object(cluster, "start_tensorfold") as start:
+            cluster.use("tensorfold", cluster.TF_NATIVE_PROFILE)
+        stop.assert_called_once_with("tensorfold")
+        start.assert_called_once_with(cluster.TF_NATIVE_PROFILE)
+
+    def test_failed_native_switch_restores_the_previous_python_runtime(self):
+        previous = {"State": {"Status": "running"}, "Config": {"Labels": {
+            "ai.dgx.profile": cluster.TF_PROFILE}}}
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(cluster, "STATE", Path(directory)), \
+             mock.patch.object(cluster, "validate"), \
+             mock.patch.object(cluster, "sync_config"), \
+             mock.patch.object(cluster, "active", side_effect=[True, False]), \
+             mock.patch.object(cluster, "inspect", return_value=previous), \
+             mock.patch.object(cluster, "memory", return_value=115), \
+             mock.patch.object(cluster, "stop_other_models"), \
+             mock.patch.object(cluster, "stop"), \
+             mock.patch.object(cluster, "run"), \
+             mock.patch.object(cluster, "start_tensorfold", side_effect=[RuntimeError("startup"), None]) as start:
+            with self.assertRaisesRegex(RuntimeError, "startup"):
+                cluster.use("tensorfold", cluster.TF_NATIVE_PROFILE)
+        self.assertEqual(start.call_args_list, [mock.call(cluster.TF_NATIVE_PROFILE), mock.call(cluster.TF_PROFILE)])
+
     def test_image_requires_the_single_call_dsml_filter(self):
         labels = {"org.opencontainers.image.revision": cluster.TF_COMMIT,
                   "ai.dgx.tensorfold.patch": "rdma-active-mtu-v1",

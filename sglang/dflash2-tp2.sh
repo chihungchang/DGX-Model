@@ -5,6 +5,9 @@ local_compose=(docker compose --env-file tp2-node0.env -f compose.dflash2-tp2.ya
 remote_compose='cd /home/chihung/ai/sglang && docker compose --env-file tp2-node1.env -f compose.dflash2-tp2.yaml'
 case "${1:-status}" in
   start)
+    if python3 ../scripts/dgx_model_cluster.py active tensorfold; then
+      exec ../dgx-model use sglang qwen-dflash2-tp2
+    fi
     "${local_compose[@]}" config --quiet
     ssh -o BatchMode=yes spark2 "${remote_compose} config --quiet && docker image inspect dgx-sglang:qwen38-dflash2-nightly-20261016-localfix-v1 >/dev/null && test -r /home/chihung/models/huggingface/maurienne-ai/Qwen3.8-27B-DFlash2-NVFP4-RTNcal/model.safetensors"
     docker image inspect dgx-sglang:qwen38-dflash2-nightly-20261016-localfix-v1 >/dev/null

@@ -1,15 +1,26 @@
 # TensorFold on two DGX Sparks
 
 Run all management commands from spark1 in /home/chihung/ai.
-The registered profile serves LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw
-across both Sparks.
+The active native profile serves
+`BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2`
+across both Sparks. The original LibertAIDAI pack was replaced with the pinned
+BLACKFOLD overlay to fit the available disks; the original Engram tables are reused.
 
 ```bash
-./dgx-model show tensorfold deepseek-v41-flash-1017-exl3-tp2
-./dgx-model image build tensorfold deepseek-v41-flash-1017-exl3-tp2
-./dgx-model model pull tensorfold deepseek-v41-flash-1017-exl3-tp2
-./dgx-model validate tensorfold deepseek-v41-flash-1017-exl3-tp2
-./dgx-model use tensorfold deepseek-v41-flash-1017-exl3-tp2
+./dgx-model use tensorfold deepseek-v41-flash-1017-blackfold-exl3-native-tp2
+./dgx-model use sglang qwen-dflash2-tp2
+```
+
+Native deployment details and reproducible build: [native/README.md](native/README.md).
+The profiles serve the same model ID and API address, with four simultaneous
+262,144-token requests including images. The native profile's `TF_DS_WINDOW`
+provides 1,245,184 shared positions independently of `--context`, including
+room for native kept-prefix growth. The Python pool remains 1,114,112 positions.
+
+```bash
+./dgx-model show tensorfold deepseek-v41-flash-1017-blackfold-exl3-native-tp2
+./dgx-model validate tensorfold deepseek-v41-flash-1017-blackfold-exl3-native-tp2
+./dgx-model use tensorfold deepseek-v41-flash-1017-blackfold-exl3-native-tp2
 ./dgx-model status tensorfold
 ./dgx-model smoke tensorfold
 ./dgx-model logs tensorfold
@@ -18,7 +29,25 @@ across both Sparks.
 API: http://10.0.0.100:8080/v1 (spark1's Wi-Fi DHCP address; spark2 is 10.0.0.101).
 Model: `deepseek-v4.1-flash-1017`.
 The Hugging Face repository ID is also accepted as an alias.
-Defaults: a 262,144-token limit per request, including text, image tokens
+The original Python and stock-native profiles remain registered, but their deleted
+LibertAI weights and rank caches must be downloaded/rebuilt before reuse. SGLang's
+model files, image, Compose configuration and profiles remain available for rollback.
+BLACKFOLD's generated shards are recorded in `blackfold-model-files.json`; each
+node has a separate `deepseek-v41-flash-1017-blackfold` cache and a provenance receipt.
+The manager validates that receipt before starting either rank.
+
+The replacement is pinned to BLACKFOLD revision
+`d795e62c91fab64531cfe6b2b5d0c0d8a95a9295`, using the author's 997,172,792-byte
+overlay with SHA-256 `f42912922985684e7a0cd8f3f6d73efafec620399e8100f09cfdb0ab67b0e649`.
+The official in-place converter checks all 43 output shards against the author's
+hashes. Only `attn.wo_b` in layers 2–39 changes; tokenizer, vision and Engram data
+are preserved. `scripts/prepare_blackfold_model.py` requires an explicit
+`--replace-libertai`, stopped ranks, predownloaded authorized assets and a native
+rank-cache builder. It deletes the obsolete rank cache, removes only redundant
+source hardlinks, replaces one model shard at a time and rebuilds the rank cache.
+Installation evidence is under `.state/blackfold-space-20261024T122138Z/`.
+
+Python profile defaults: a 262,144-token limit per request, including text, image tokens
 and its reply, and 1,114,112 tokens of shared KV storage for up to four
 concurrent requests. Four requests filling their 256K windows reserve
 1,056,768 pool positions after allocator alignment and scratch space.
@@ -26,7 +55,7 @@ Five DSpark/MTP drafts, text and image input, temperature 1.0.
 Thinking is off by default; a request can
 set reasoning_effort or chat_template_kwargs.enable_thinking.
 
-Image input is enabled with --vision and --vision-urls. Send image_url
+The Python profile enables image input with --vision and --vision-urls. Send image_url
 content parts with base64 data URLs or HTTP(S) URLs. The image encoder
 runs on spark1, using about 0.95 GiB of CUDA allocations for the loaded
 tower plus temporary encoding buffers.
@@ -152,7 +181,8 @@ python3 scripts/dgx_model_cluster.py rdma-probe tensorfold
 
 | Component | Pinned source |
 | --- | --- |
-| Engine | Elevatormusic/TensorFold@07aa02585f64cfb04c60a96de6554c0d4708ed46 |
+| Python engine | Elevatormusic/TensorFold@07aa02585f64cfb04c60a96de6554c0d4708ed46 |
+| Native engine | bertholomus/TensorFold@a57deb9d470b27e1e3fab2a9494915a0049415aa |
 | EXL3 weights | LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw@afc7aa0aab98ee735c0f54e0a122019af1ac08f1 |
 | Engram shards 47/48 | deepseek-ai/DeepSeek-V4.1-Flash-1017@1bae0e1088993b9b82de08f59de5be5a34e42170 |
 | NGC PyTorch 26.07 | nvcr.io/nvidia/pytorch@sha256:2140e699b3beaf7f96a0081fd9c9406bc3832b435cdb60dfa2d261f7d2f34a1c |

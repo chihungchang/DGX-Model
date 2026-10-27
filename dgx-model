@@ -73,7 +73,9 @@ Engines:
   tensorfold Pinned DeepSeek-V4.1 EXL3 engine across two DGX Sparks, port 8080.
 
 Two-node profiles (run from spark1):
+  ./dgx-model use tensorfold deepseek-v41-flash-1017-blackfold-exl3-native-tp2
   ./dgx-model use tensorfold deepseek-v41-flash-1017-exl3-tp2
+  ./dgx-model use tensorfold deepseek-v41-flash-1017-exl3-native-tp2
   ./dgx-model use sglang qwen-dflash2-tp2
       Switch both nodes; validate the target before stopping the active engine.
 EOF

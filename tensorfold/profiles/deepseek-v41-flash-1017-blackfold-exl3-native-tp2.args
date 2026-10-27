@@ -1,0 +1,37 @@
+# hf-model: BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2
+# hf-revision-id: d795e62c91fab64531cfe6b2b5d0c0d8a95a9295
+# base-revision-id: afc7aa0aab98ee735c0f54e0a122019af1ac08f1
+# overlay-sha256: f42912922985684e7a0cd8f3f6d73efafec620399e8100f09cfdb0ab67b0e649
+# cluster: tensorfold-tp2
+# tensorfold-runtime: native
+# tensorfold-commit: a57deb9d470b27e1e3fab2a9494915a0049415aa
+# per-request-context: 262144 including text, images, reasoning and reply
+# shared-context: 1245184 positions; four simultaneous full 256K requests
+serve
+/model
+--host
+0.0.0.0
+--port
+8080
+--name
+deepseek-v4.1-flash-1017
+--alias
+BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2
+--context
+262144
+--parallel
+4
+--max-tokens
+32768
+--temperature
+1.0
+--top-p
+1.0
+--top-k
+0
+--no-thinking
+--prompt-cache-gib
+2
+--backend
+cuda
+--no-update-check

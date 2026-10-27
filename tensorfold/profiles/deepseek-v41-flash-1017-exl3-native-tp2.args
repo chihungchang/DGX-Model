@@ -1,0 +1,35 @@
+# hf-model: LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw
+# hf-revision-id: afc7aa0aab98ee735c0f54e0a122019af1ac08f1
+# cluster: tensorfold-tp2
+# tensorfold-runtime: native
+# tensorfold-commit: a57deb9d470b27e1e3fab2a9494915a0049415aa
+# per-request-context: 262144 tokens including text, images and reply
+# shared-context: 1245184 positions, four concurrent requests
+serve
+/model
+--host
+0.0.0.0
+--port
+8080
+--name
+deepseek-v4.1-flash-1017
+--alias
+LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw
+--context
+262144
+--parallel
+4
+--max-tokens
+32768
+--temperature
+1.0
+--top-p
+1.0
+--top-k
+0
+--no-thinking
+--prompt-cache-gib
+2
+--backend
+cuda
+--no-update-check

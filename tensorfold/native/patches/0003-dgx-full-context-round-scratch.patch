@@ -1,0 +1,42 @@
+--- a/zig/src/families/dsv41/model.zig
++++ b/zig/src/families/dsv41/model.zig
+@@ -32,6 +32,21 @@
+ 
+ /// The served prompt chunk (TF_DS_PREFILL_CHUNK): a prompt runs in chunks that start at its multiples.
+ pub const chunk_rows = 4096;
++
++/// The API's prompt/reply window excludes the draft round and allocator alignment.
++fn contextExtent(context: usize, pool: usize, rows: usize) usize {
++    if (context == 0) return pool;
++    return @min(std.mem.alignForward(usize, context + rows + 2, chunk_rows), pool);
++}
++
++test "four full 256K API windows retain round scratch inside their shared pool" {
++    const cap = contextExtent(262144, 1114112, 16);
++    try std.testing.expectEqual(@as(usize, 266240), cap);
++    try std.testing.expect(4 * cap <= 1114112);
++    try std.testing.expectEqual(@as(usize, 1114112), contextExtent(0, 1114112, 16));
++    try std.testing.expectEqual(@as(usize, 262144), contextExtent(262144, 262144, 16));
++}
++
+ /// Rows between resume points: the served build's 2048-row grid. Kept states land on it; a pass is cut short to end at
+ /// the next one it keeps, so a longer pass resumes where a 2048-row pass would.
+ pub const resume_rows = 2048;
+@@ -54,7 +69,7 @@
+     engram_dir: ?[]const u8 = null, // the Engram tables (none: a checkpoint without Engram layers)
+     token_map: ?[]const u8 = null, // the compressed token map (the lane's JSON cache)
+     pool: usize = 1 << 18, // positions of the streams' shared plane (their extents together)
+-    context: usize = 0, // a stream's extent at most (its prompt, budget and a round's rows; 0: the pool)
++    context: usize = 0, // logical prompt plus reply window (0: the pool); its extent adds round scratch
+     drafts: bool = true, // load the DSpark drafter
+     rdma_devices: ?[]const u8 = null, // the decode gathers over RDMA on these devices (comma separated), else NCCL: TP2's
+     // ring (rdma.zig), or at world 4 the 2D split's decode-size exchanges over its rings (ring2d.zig)
+@@ -198,7 +213,7 @@
+         m.round_ms = o.round_ms orelse &draft.round_ms;
+         if (m.round_ms.len == 0) return error.BadRoundMs;
+         m.pool_cap = o.pool;
+-        m.ctx_cap = if (o.context != 0) @min(o.context, o.pool) else o.pool;
++        m.ctx_cap = contextExtent(o.context, o.pool, o.round_rows);
+         m.fill_slot = 0;
+         m.prof = false;
+         m.timer = null;

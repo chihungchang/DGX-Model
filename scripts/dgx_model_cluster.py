@@ -20,6 +20,12 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent.parent
 WORKER = "spark2"
 TF_PROFILE = "deepseek-v41-flash-1017-exl3-tp2"
+TF_NATIVE_PROFILE = "deepseek-v41-flash-1017-exl3-native-tp2"
+TF_BLACKFOLD_PROFILE = "deepseek-v41-flash-1017-blackfold-exl3-native-tp2"
+TF_NATIVE_COMMIT = "a57deb9d470b27e1e3fab2a9494915a0049415aa"
+BLACKFOLD_ID = "BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2"
+BLACKFOLD_REVISION = "d795e62c91fab64531cfe6b2b5d0c0d8a95a9295"
+BLACKFOLD_OVERLAY_SHA = "f42912922985684e7a0cd8f3f6d73efafec620399e8100f09cfdb0ab67b0e649"
 SG_PROFILE = "qwen-dflash2-tp2"
 TF_IMAGE = "dgx-tensorfold:deepseek-v41-07aa02585f64-pool-v2-dsml-v1-images-v1-output-ceiling-v1"
 TF_COMMIT = "07aa02585f64cfb04c60a96de6554c0d4708ed46"
@@ -27,6 +33,8 @@ TF_BASE_CONFIG = "sha256:15b8de8baabe68e46afc51e88f3ccad5042013bafe8f244ec082ce0
 TF_LOCAL_BASE = "nvcr.io/nvidia/pytorch:26.07-py3-verified-arm64"
 MODEL_VIEW = Path.home() / "models/tensorfold/deepseek-v41-flash-1017-exl3-2.9bpw"
 CACHE = Path.home() / ".cache/tensorfold/deepseek-v41-flash-1017"
+BLACKFOLD_VIEW = Path.home() / "models/tensorfold/deepseek-v41-flash-1017-blackfold-exl3-2.9bpw"
+BLACKFOLD_CACHE = Path.home() / ".cache/tensorfold/deepseek-v41-flash-1017-blackfold"
 STATE = ROOT / "tensorfold/.state"
 RECIPE = ROOT / "tensorfold/vendor/deepseek-v41"
 TEMPLATE_SHA = "defbdfc2a28ea921d9ad4c6be7244fa82c53f6d552507527a944ad4cbdd24a6d"
@@ -70,23 +78,44 @@ def value(args, flag, default=""):
     return args[args.index(flag) + 1] if flag in args else default
 
 
+def native_profile(profile):
+    return profile in (TF_NATIVE_PROFILE, TF_BLACKFOLD_PROFILE)
+
+
+def model_view(profile):
+    return BLACKFOLD_VIEW if profile == TF_BLACKFOLD_PROFILE else MODEL_VIEW
+
+
+def cache_dir(profile):
+    return BLACKFOLD_CACHE if profile == TF_BLACKFOLD_PROFILE else CACHE
+
+
+def model_manifest(profile):
+    return ROOT / "tensorfold" / ("blackfold-model-files.json" if profile == TF_BLACKFOLD_PROFILE else "model-files.json")
+
+
+def env_suffix(profile):
+    return "-blackfold" if profile == TF_BLACKFOLD_PROFILE else "-native" if native_profile(profile) else ""
+
+
 def profile_path(engine, profile):
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", profile):
         raise ValueError("Invalid profile name")
     if engine == "sglang" and profile == SG_PROFILE:
         return ROOT / "sglang/profiles/qwen-dflash2-tp2-node0.args"
     path = ROOT / "tensorfold/profiles" / (profile + ".args")
-    if engine != "tensorfold" or profile != TF_PROFILE or not path.is_file():
+    if engine != "tensorfold" or profile not in (TF_PROFILE, TF_NATIVE_PROFILE, TF_BLACKFOLD_PROFILE) or not path.is_file():
         raise ValueError("Unknown cluster profile: " + engine + "/" + profile)
     return path
 
 
 def prepare_env(profile=TF_PROFILE):
     for rank in (0, 1):
-        path = ROOT / "tensorfold" / f"node{rank}.env"
+        suffix = env_suffix(profile)
+        path = ROOT / "tensorfold" / f"node{rank}{suffix}.env"
         path.write_text(
             f"TENSORFOLD_RANK={rank}\nTENSORFOLD_PROFILE={profile}\n"
-            f"TENSORFOLD_MODEL_VIEW={MODEL_VIEW}\nTENSORFOLD_CACHE_DIR={CACHE}\n"
+            f"TENSORFOLD_MODEL_VIEW={model_view(profile)}\nTENSORFOLD_CACHE_DIR={cache_dir(profile)}\n"
         )
         path.chmod(0o600)
 
@@ -94,8 +123,9 @@ def prepare_env(profile=TF_PROFILE):
 def compose(engine, rank, profile=None):
     if engine == "tensorfold":
         directory = ROOT / "tensorfold"
-        env = directory / f"node{rank}.env"
-        filename = directory / "compose.yaml"
+        suffix = env_suffix(profile)
+        env = directory / f"node{rank}{suffix}.env"
+        filename = directory / ("compose.native.yaml" if suffix else "compose.yaml")
     else:
         directory = ROOT / "sglang"
         env = directory / f"tp2-node{rank}.env"
@@ -143,13 +173,13 @@ def image_info(rank):
     return item["Id"]
 
 
-def model_errors(rank):
-    manifest = json.loads((ROOT / "tensorfold/model-files.json").read_text())
+def model_errors(rank, profile=TF_PROFILE):
+    manifest = json.loads(model_manifest(profile).read_text())
     expected = {x["path"]: x["size"] for x in manifest["files"]
                 if x["path"].endswith(".safetensors")}
     code = (
         "import pathlib,json,hashlib\n"
-        f"root=pathlib.Path({str(MODEL_VIEW)!r})\nexpected={expected!r}\n"
+        f"root=pathlib.Path({str(model_view(profile))!r})\nexpected={expected!r}\n"
         "errors=[]\n"
         "for name,size in expected.items():\n"
         " p=root/name\n"
@@ -178,10 +208,10 @@ def extension_errors(rank, image_id):
         "print(json.dumps(errors))", rank)
 
 
-def check_cache_space(rank):
+def check_cache_space(rank, profile=TF_PROFILE):
     info = probe(
         "import pathlib,json,shutil\n"
-        f"root=pathlib.Path({str(CACHE)!r})\n"
+        f"root=pathlib.Path({str(cache_dir(profile))!r})\n"
         "p=root/'tf-ds-rank'\n"
         "used=sum(f.stat().st_blocks*512 for f in p.rglob('*') if f.is_file()) if p.exists() else 0\n"
         "print(json.dumps({'free':shutil.disk_usage(root).free,'rank_cache':used}))", rank)
@@ -191,26 +221,61 @@ def check_cache_space(rank):
                          f"only {info['free'] / 1024**3:.1f} GiB remains")
 
 
+def native_artifact_errors(rank, profile=TF_NATIVE_PROFILE):
+    return probe(
+        "import pathlib,json,hashlib,struct\n"
+        f"root=pathlib.Path({str(ROOT / 'tensorfold/native/runtime')!r})\n"
+        "receipt=root/'build.json'\n"
+        "v=json.loads(receipt.read_text()) if receipt.is_file() else {}\n"
+        f"errors=[] if v.get('engine_commit')=={TF_NATIVE_COMMIT!r} else ['native build revision mismatch']\n"
+        "patches={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (root.parent/'patches').glob('*.patch')}\n"
+        "if v.get('patches')!=patches:errors.append('native patch/build mismatch')\n"
+        "files=v.get('files',[])\n"
+        "if len(files)<370:errors.append('native binaries/kernel kit are incomplete')\n"
+        "for f in files:\n"
+        " p=root/f['path']\n"
+        " if not p.is_file() or p.stat().st_size!=f['size']:errors.append(f['path']);continue\n"
+        " if hashlib.sha256(p.read_bytes()).hexdigest()!=f['sha256']:errors.append(f['path']+' (hash mismatch)')\n"
+        f"cache=pathlib.Path({str(cache_dir(profile))!r})\n"
+        f"blackfold={profile == TF_BLACKFOLD_PROFILE!r}\n"
+        "if blackfold:\n"
+        " p=cache/'blackfold-model.json'\n"
+        " receipt=json.loads(p.read_text()) if p.is_file() else {}\n"
+        f" if receipt.get('repo_id')!={BLACKFOLD_ID!r} or receipt.get('revision')!={BLACKFOLD_REVISION!r} or receipt.get('overlay_sha256')!={BLACKFOLD_OVERLAY_SHA!r}:errors.append('BLACKFOLD cache provenance mismatch')\n"
+        f" if receipt.get('rank')!={rank}:errors.append('BLACKFOLD cache rank mismatch')\n"
+        f"ranks=list((cache/'tf-ds-rank').glob('rank{rank}of2-*.bin'))\n"
+        "if len(ranks)!=1:errors.append('expected one existing rank cache')\n"
+        "else:\n"
+        " if blackfold and (receipt.get('cache_file')!=ranks[0].name or receipt.get('cache_size')!=ranks[0].stat().st_size):errors.append('BLACKFOLD cache receipt does not match file')\n"
+        " with ranks[0].open('rb') as stream:\n"
+        "  stream.seek(-16,2);footer=stream.read(16)\n"
+        " if footer[8:]!=b'TFDSRK01':errors.append('invalid rank cache footer')\n"
+        " if blackfold and receipt.get('cache_index_offset')!=struct.unpack('<Q',footer[:8])[0]:errors.append('BLACKFOLD cache index mismatch')\n"
+        "if not (cache/'dsv41-token-map.json').is_file():errors.append('missing Engram token map')\n"
+        "print(json.dumps(errors))", rank)
+
+
 def validate(engine, profile, *, require_data=True):
     profile_path(engine, profile)
     if engine == "tensorfold":
         prepare_env(profile)
     image_ids = []
     for rank in (0, 1):
-        run([*compose(engine, rank), "config", "--quiet"], rank)
+        run([*compose(engine, rank, profile), "config", "--quiet"], rank)
         if not require_data:
             continue
         if engine == "tensorfold":
-            errors = model_errors(rank)
+            errors = model_errors(rank, profile)
             if errors:
                 raise ValueError(f"Rank {rank}: missing or invalid model files: {errors[:8]}")
             image_id = image_info(rank)
             if not image_id:
                 raise ValueError(f"Rank {rank}: build the TensorFold image first")
-            errors = extension_errors(rank, image_id)
+            errors = (native_artifact_errors(rank, profile) if native_profile(profile) else
+                      extension_errors(rank, image_id))
             if errors:
-                raise ValueError(f"Rank {rank}: {errors}; run the extensions command before switching")
-            check_cache_space(rank)
+                raise ValueError(f"Rank {rank}: {errors}; prepare this runtime before switching")
+            check_cache_space(rank, profile)
             image_ids.append(image_id)
         else:
             code = (
@@ -245,13 +310,18 @@ def list_row(engine, profile):
     args = arguments(profile_path(engine, profile))
     model = value(args, "--name") if engine == "tensorfold" else value(args, "--served-model-name")
     context = value(args, "--context") if engine == "tensorfold" else value(args, "--context-length")
-    running = active(engine)
+    item = inspect(names(engine)[0])
+    running = bool(item and item["State"]["Status"] == "running" and
+                   (engine != "tensorfold" or
+                    (item["Config"].get("Labels") or {}).get("ai.dgx.profile", profile) == profile))
     if engine == "tensorfold":
-        manifest = json.loads((ROOT / "tensorfold/model-files.json").read_text())
-        ready = all((MODEL_VIEW / f["path"]).is_file() and
-                    (MODEL_VIEW / f["path"]).stat().st_size == f["size"]
+        manifest_path = model_manifest(profile)
+        manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {"files": []}
+        view = model_view(profile)
+        ready = bool(manifest["files"]) and all((view / f["path"]).is_file() and
+                    (view / f["path"]).stat().st_size == f["size"]
                     for f in manifest["files"] if f["path"].endswith(".safetensors"))
-        source = "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw"
+        source = BLACKFOLD_ID if profile == TF_BLACKFOLD_PROFILE else "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw"
     else:
         source = value(args, "--model-path").removeprefix("/models/")
         ready = (Path.home() / "models/huggingface" / source / "config.json").exists()
@@ -265,7 +335,11 @@ def show(engine, profile):
     print(json.dumps({"engine": engine, "profile": profile, "nodes": ["spark1", WORKER],
                       "image": TF_IMAGE if engine == "tensorfold" else
                       run([*compose(engine, 0), "config", "--images"]).stdout.strip(),
-                      "model_view": str(MODEL_VIEW) if engine == "tensorfold" else None,
+                      "model_view": str(model_view(profile)) if engine == "tensorfold" else None,
+                      "runtime": ("native" if native_profile(profile) else "python")
+                                 if engine == "tensorfold" else engine,
+                      "revision": (TF_NATIVE_COMMIT if native_profile(profile) else TF_COMMIT)
+                                  if engine == "tensorfold" else None,
                       "arguments": args, "api": API + "/v1"}, indent=2))
 
 
@@ -313,6 +387,12 @@ def wait_ready(engine, model, timeout=3600):
             with urllib.request.urlopen(API + "/v1/models", timeout=5) as response:
                 ids = [m["id"] for m in json.load(response).get("data", [])]
             if model in ids:
+                if engine == "tensorfold":
+                    with urllib.request.urlopen(API + "/health", timeout=5) as response:
+                        health = json.load(response)
+                    if health.get("warming", False):
+                        time.sleep(2)
+                        continue
                 print("Serving " + model + " at " + API + "/v1", flush=True)
                 return
         except (OSError, ValueError):
@@ -342,10 +422,37 @@ def start_sglang():
     restore_comfyui()
 
 
+def start_tensorfold(profile):
+    if native_profile(profile):
+        # The native worker connects to the head when its rendezvous opens.
+        for rank in (1, 0):
+            run([*compose("tensorfold", rank, profile), "up", "-d", "--no-build", "--force-recreate"],
+                rank, capture=False)
+    else:
+        run([*compose("tensorfold", 0, profile), "up", "-d", "--no-build", "--force-recreate"],
+            capture=False)
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            if re.search(r":29551\s", run(["ss", "-lntH"]).stdout):
+                break
+            item = inspect(names("tensorfold")[0])
+            if not item or item["State"]["Status"] == "exited":
+                raise RuntimeError("TensorFold rank 0 failed before rendezvous")
+            time.sleep(2)
+        else:
+            raise RuntimeError("TensorFold rendezvous did not open")
+        run([*compose("tensorfold", 1, profile), "up", "-d", "--no-build", "--force-recreate"],
+            1, capture=False)
+    wait_ready("tensorfold", value(arguments(profile_path("tensorfold", profile)), "--name"))
+
+
 def use(engine, profile, recreate=False):
     # All validation is before the first stop; an invalid profile must leave the live server alone.
     validate(engine, profile)
-    if active(engine) and not recreate:
+    previous = inspect(names("tensorfold")[0]) if engine == "tensorfold" else None
+    previous_profile = ((previous["Config"].get("Labels") or {}).get("ai.dgx.profile", TF_PROFILE)
+                        if previous and previous["State"]["Status"] == "running" else None)
+    if active(engine) and not recreate and (engine != "tensorfold" or previous_profile == profile):
         args = arguments(profile_path(engine, profile))
         model = value(args, "--name") if engine == "tensorfold" else value(args, "--served-model-name")
         wait_ready(engine, model, timeout=60)
@@ -378,36 +485,29 @@ def use(engine, profile, recreate=False):
             free = memory(rank)
             if free < 100:
                 raise RuntimeError(f"Rank {rank}: only {free:.1f} GiB available; need at least 100 GiB")
-            run(["mkdir", "-p", CACHE], rank)
-        # Rank 0 creates the rendezvous store. Rank 1 then joins it.
-        run([*compose("tensorfold", 0), "up", "-d", "--no-build", "--force-recreate"],
-            capture=False)
-        deadline = time.monotonic() + 120
-        while time.monotonic() < deadline:
-            if re.search(r":29551\s", run(["ss", "-lntH"]).stdout):
-                break
-            item = inspect(names("tensorfold")[0])
-            if not item or item["State"]["Status"] == "exited":
-                raise RuntimeError("TensorFold rank 0 failed before rendezvous")
-            time.sleep(2)
-        else:
-            raise RuntimeError("TensorFold rendezvous did not open")
-        run([*compose("tensorfold", 1), "up", "-d", "--no-build", "--force-recreate"],
-            1, capture=False)
-        wait_ready("tensorfold", value(arguments(profile_path(engine, profile)), "--name"))
+            run(["mkdir", "-p", cache_dir(profile)], rank)
+        start_tensorfold(profile)
     except Exception:
         print("TensorFold startup failed; stopping both ranks.", flush=True)
         stop("tensorfold", True)
-        if old_sglang:
+        if previous_profile:
+            print("Restoring the previous TensorFold runtime.", flush=True)
+            start_tensorfold(previous_profile)
+        elif old_sglang:
             print("Restoring the previous SGLang service.", flush=True)
             start_sglang()
-        else:
+        elif not native_profile(profile):
             restore_comfyui()
         raise
 
 
 def build_image(profile):
     profile_path("tensorfold", profile)
+    if native_profile(profile):
+        run(["python3", ROOT / "scripts/build_tensorfold_native.py", "--model", model_view(profile) / "model"], capture=False)
+        sync_config(profile)
+        validate("tensorfold", profile)
+        return
     prepare_env(profile)
     build_args = []
     local_base = run(["docker", "image", "inspect", "--format", "{{.Id}}", TF_LOCAL_BASE],
@@ -493,7 +593,11 @@ def probe_rdma():
             future.result()
 
 
-def pull_models():
+def pull_models(profile=TF_PROFILE):
+    if profile == TF_BLACKFOLD_PROFILE:
+        validate("tensorfold", profile)
+        print("The pinned BLACKFOLD model is installed and verified. Use prepare_blackfold_model.py for an explicit one-time replacement.")
+        return
     sync_config()
     with ThreadPoolExecutor(max_workers=2) as pool:
         downloads = [pool.submit(run, ["bash", RECIPE / "scripts/download.sh", phase],
@@ -515,7 +619,8 @@ def status(engine):
     for rank, name in enumerate(names(engine)):
         item = inspect(name, rank)
         state = item["State"]["Status"] if item else "absent"
-        profile = (TF_PROFILE if engine == "tensorfold" else SG_PROFILE) if item else "-"
+        profile = ((item["Config"].get("Labels") or {}).get("ai.dgx.profile") or
+                   (TF_PROFILE if engine == "tensorfold" else SG_PROFILE)) if item else "-"
         print(f"engine={engine} rank={rank} container={name} profile={profile} state={state}")
 
 
@@ -551,6 +656,9 @@ def main():
         return 0 if active(args.engine) else 1
     elif args.command == "list":
         list_row(args.engine, profile)
+        if args.engine == "tensorfold" and args.profile is None:
+            list_row(args.engine, TF_NATIVE_PROFILE)
+            list_row(args.engine, TF_BLACKFOLD_PROFILE)
     elif args.command == "show":
         show(args.engine, profile)
     elif args.command == "validate":
@@ -560,7 +668,7 @@ def main():
     elif args.command == "compose-config":
         if args.engine == "tensorfold":
             prepare_env(profile)
-        run([*compose(args.engine, 0), "config"], capture=False)
+        run([*compose(args.engine, 0, profile), "config"], capture=False)
     elif args.command == "use":
         use(args.engine, profile, args.recreate)
     elif args.command == "stop":
@@ -576,7 +684,7 @@ def main():
     elif args.command == "rdma-probe":
         probe_rdma()
     elif args.command == "model-pull":
-        pull_models()
+        pull_models(profile)
     else:
         parser.error("Unknown command: " + args.command)
     return 0
