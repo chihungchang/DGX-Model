@@ -31,6 +31,8 @@ services:
       TF_DS_WINDOW: "1245184"
       TF_DS_STREAMS: "4"
       TF_DS_ROUND_ROWS: "16"
+      TF_FILL_CHUNKS: "1"
+      TF_FILL_ROUNDS: "4096"
       TF_DS_REPLAY_FLOOR: "1"
       TF_DS_GRAPHS: "1"
       TF_DS_HC_SIDE: "1"

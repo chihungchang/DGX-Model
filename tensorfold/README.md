@@ -1,10 +1,243 @@
 # TensorFold on two DGX Sparks
 
 Run all management commands from spark1 in /home/chihung/ai.
-The active native profile serves
+The retained native profile is configured to serve
 `BlackwellBoy/DeepSeek-V4.1-Flash-1017-BLACKFOLD-EXL3-2.9bpw-TP2`
 across both Sparks. The original LibertAIDAI pack was replaced with the pinned
 BLACKFOLD overlay to fit the available disks; the original Engram tables are reused.
+
+TensorFold was restored on both nodes on 2026-10-28 at the user's request.
+The 43 backbone shards were downloaded from the pinned LibertAI base, restored
+with the original BLACKFOLD overlay and checked against all author SHA-256
+hashes on both nodes. Both rank caches were rebuilt, and each passed all 114
+overlay-tensor slice comparisons. The retained Engram files, native runtime,
+256K request limit and four-request configuration are unchanged. Text, image
+token accounting, image replies, single tool calls, four simultaneous replies
+and the LAN API passed after restoration.
+
+The llama.cpp API and both RPC workers were stopped. Its Abiray GGUF backbone,
+separate GGUF Engram and Q8_0 DSpark were deleted from spark1 (239.49 GiB), along
+with the temporary GGUF Engram copy on spark2 (103.00 GiB). The llama.cpp
+profiles, patches, images and benchmark evidence remain. Restoration receipts,
+model hashes, cache provenance, API checks and deletion manifests are under
+`.state/restore-20261027T230035Z/`. The previous TensorFold deletion manifests
+are retained under `../llama.cpp/backups/abiray-tp2-20261027/removed-tensorfold-*`.
+
+The served DSpark block size is the checkpoint's original five tokens, with
+adaptive verification. On 2026-10-28 the user chose to keep the existing native
+build and limit tuning to supported deployment parameters. The experimental
+block-eight engine changes were rolled back on both nodes and in the local
+build sources; the disabled patch and diagnostics remain only under
+`.state/dspark8-20261028T003708Z/`.
+
+A deployment-parameter audit on 2026-10-28 retained the original settings.
+With the same greedy prose requests, the original short-prompt decode medians
+were 56.48 and 56.25 tokens/s across two launches. Setting `TF_DS_SERVED_K=solo`,
+`TF_DS_SOLO_OVERHEAD=1` and `TF_DS_NO_COPIES=1` together gave 55.05 tokens/s.
+Setting only `TF_DS_PASS_FROM=0` gave 56.10 tokens/s; its cold 32K prefill took
+14.86 s versus 15.50 and 16.44 s, and its cold 256K prefill took 119.50 s
+versus 121.03 s in the final original-settings check. The earlier original
+256K check took 122.28 s, so the small full-context difference is close to
+baseline variation. Cached 256K TTFT also increased from 1.21 to 1.59 s.
+Neither trial was retained. The 256K tests used 261,632 input and 512 output
+tokens; four simultaneous short requests also passed. All measured replies
+matched their reference token hashes, and the runtime, launcher and profile
+hashes remained unchanged on both nodes. Requests, SSE events, memory samples
+and the comparison are in `.state/params-20261028T011646Z/`.
+
+The subsequent unchanged-native speed check sent four full 256K requests
+together: 261,632 input tokens plus 512 output tokens each, text only,
+temperature 0 and thinking off. Cold prefill ran one prompt at a time,
+pausing the other streams' generation. First content arrived at 120.59,
+241.23, 362.67 and 484.15 s; all four finished in 501.70 s. Combined cold
+prefill processed 2,161.66 tokens/s. Three cached repeats each reused 260,096
+tokens per request. Their median batch time was 22.28 s for 2,048 output
+tokens, or 91.91 output tokens/s including cache replay and waiting.
+Per-request first-to-last-content decode rate had a median of 26.82 tokens/s
+(24.18 to 30.16 across the 12 cached replies). Every cached reply matched its
+cold reference token hash, and monitoring confirmed four active decoding
+streams. Neither rank restarted or ran out of memory; lowest sampled host
+MemAvailable was 7.68/9.57 GiB. Container identities, runtime hashes and
+deployment files were unchanged. Evidence: `.state/speed-4x256k-20261028T014933Z/`.
+
+The current native deployment enables prefill interleaving at the user's
+request: `TF_FILL_CHUNKS=1` and `TF_FILL_ROUNDS=4096`; `TF_FILL_MANY` is
+unset, using the original disabled default. One existing prefill chunk runs
+between groups of 4096 generation rounds. The original 2K/4K prefill chunk
+sizes, 256K request limit, four-request capacity and DSpark block five remain
+unchanged. A new prompt enters prefill after the preceding prompt finishes
+prefilling. GPU time is still shared, and a chunk can briefly pause generation.
+After the mixed-load trials below, the user selected this configuration again.
+Only deployment parameters changed.
+
+In the paired 32K test at 16 rounds, the generating reply's longest content gap fell
+from 15.65 s to 2.14 s, with identical reply token hashes. The long prompt's
+TTFT increased from 15.59 s to 23.05 s. A full-context mixed test started
+three short-prompt replies, then sent a cold 261,632-token prompt with a
+512-token output budget. The three existing 512-token replies finished
+in 52.77-55.43 s, with maximum content gaps of 2.34 s and reply token hashes
+matching their original solo runs. The 256K request's TTFT was 141.04 s;
+the whole batch finished in 152.82 s. Interleaving only four rounds gave
+157.54-158.04 s for the existing replies and a 153.53 s long-prompt TTFT,
+so the 16-round setting was retained. Evidence:
+`.state/interleave-20261028T022105Z/`. Only deployment environment variables
+changed; both native binaries, kernels, launcher and model profile are retained.
+
+The later 32-round trial reused the exact three short producer requests and
+the full 256K request from the 16-round trial. Only `TF_FILL_ROUNDS` changed.
+The producers' generation rates increased from 9.51-9.89 to 15.21-15.77
+tokens/s, and they finished their 512-token replies in 34.33-34.63 s rather
+than 52.77-55.43 s. The longest content gap increased from 2.34 to 3.02 s.
+The long request's TTFT was 138.27 s versus 141.04 s, and the complete batch
+took 150.27 s versus 152.82 s. All four response token hashes matched the
+16-round reference. This is one mixed batch at each setting, rather than
+four cold full-context prompts or a sustained-load comparison. The requested
+32-round setting was retained after that trial; evidence:
+`.state/interleave32-20261028T024010Z/`.
+
+The subsequent 64-round trial again changed only `TF_FILL_ROUNDS`, with
+`TF_FILL_CHUNKS=1` and all request bodies retained. The three producers
+generated at 22.66-24.02 tokens/s and finished their 512-token replies in
+23.09-23.33 s, versus 15.21-15.77 tokens/s and 34.33-34.63 s at 32 rounds.
+The longest observed content gap was 2.16 s versus 3.02 s. The full-context
+request's TTFT was 136.53 s versus 138.27 s, and the complete batch took
+148.52 s versus 150.27 s. All four response token hashes matched the
+32-round reference. These are single mixed-batch measurements with finite
+512-token producers, rather than a sustained-load or four-full-context
+comparison. The requested 64-round setting was retained after that trial; evidence:
+`.state/interleave64-20261028T025100Z/`.
+
+The requested 256-round trial reused the same requests and changed only
+`TF_FILL_ROUNDS`. The three producers generated at 30.06-31.19 tokens/s,
+finishing their 512-token replies in 17.78-18.29 s, versus 22.66-24.02
+tokens/s and 23.09-23.33 s at 64 rounds. Their longest observed content
+gap was 1.27 s versus 2.16 s. The full-context request's TTFT was 134.44 s
+versus 136.53 s, and the complete batch took 146.43 s versus 148.52 s.
+All four response token hashes matched the 64-round reference. In this
+single mixed batch, the producers' average decode rate increased 31.5%,
+while total batch time fell only 1.4%. The finite 512-token replies finish
+early; these results do not establish performance under sustained
+generation or four cold full-context requests. The requested 256-round
+setting was retained after that trial; evidence:
+`.state/interleave256-20261028T025750Z/`.
+
+The 1024-round trial again changed only `TF_FILL_ROUNDS` and retained all
+four request bodies. The three producers generated at 32.30-33.61 tokens/s,
+finishing in 16.63-17.15 s, versus 30.06-31.19 tokens/s and 17.78-18.29 s
+at 256 rounds. Their longest content gaps were effectively unchanged
+(1.263 s versus 1.265 s). The long request's TTFT was 134.52 s versus
+134.44 s, and complete batch time was 146.55 s versus 146.43 s. All four
+response token hashes matched the 256-round reference. Average producer
+decode improved 7.7%, with no meaningful full-batch speed-up in this single
+mixed-batch comparison. These finite 512-token producers completed in
+307-321 verification rounds, so the result does not establish scheduling
+behavior under sustained generation. The requested 1024-round setting was
+retained after that trial; evidence: `.state/interleave1024-20261028T033908Z/`.
+
+The requested 4096-round trial changed only `TF_FILL_ROUNDS` and reused
+the exact mixed requests. Producer generation was 32.38-33.69 tokens/s,
+versus 32.30-33.61 tokens/s at 1024 rounds, and their 512-token replies
+finished in 16.59-17.09 s versus 16.63-17.15 s. Longest content gaps were
+1.275 s versus 1.263 s. The full-context request's TTFT was 136.28 s
+versus 134.52 s; complete batch time was 148.34 s versus 146.55 s. All
+four response token hashes matched the 1024-round reference. This single
+comparison shows no meaningful extra benefit: average producer decode
+changed only 0.23%, and the complete batch was 1.22% slower. Each finite
+producer still completed in 307-321 verification rounds, below either
+configured allowance, so longer-running generation is needed to assess
+the scheduling difference. The requested 4096-round setting is retained;
+evidence: `.state/interleave4096-20261028T035812Z/`.
+
+The two-prefill/two-decoder test enabled only `TF_FILL_MANY=1`, retaining
+one chunk and 4096 generation rounds. Two decoder contexts were first
+preloaded; the main test reused 251,904 cached tokens in each 253,952-token
+prompt and generated 8,192 tokens per decoder. Once both were streaming,
+two cold 261,632-input/512-output requests were released together, 0.134 ms
+apart. Every main request's full token budget was exactly 262,144.
+Monitoring confirmed all four admitted with no waiting queue. The decoders
+generated at 48.76/49.09 tokens/s and finished in 169.44/169.90 s; each
+used only 3420/3428 verification rounds, below the 4096-round allowance.
+The cold requests' first-token waits were 310.62 and 441.31 s from their
+simultaneous submissions, separated by 130.68 s. This demonstrates the
+strong generation preference and oldest-first tie behavior, rather than
+equal interleaving of two long prefills. Main-batch wall time was 454.45 s
+for 17,408 output tokens, or 38.31 tokens/s including cold prefill and
+waiting; the preparatory preload time was excluded. Both cold replies
+matched their cached replays. No rank restarted or ran out of memory,
+and both native runtimes and the model profile remained unchanged.
+Evidence: `.state/mixed-2prefill-2decode-20261028T040941Z/`.
+
+The two-prefill/two-decoder repeat changed only `TF_FILL_ROUNDS` from 4096
+to 1024, keeping `TF_FILL_CHUNKS=1`, `TF_FILL_MANY=1` and every request body
+identical. The two 8,192-token decoders generated at 47.66/47.90 tokens/s
+and finished in 173.36/174.07 s, versus 48.76/49.09 tokens/s and
+169.44/169.90 s at 4096 rounds. The longest content gap overlapping the
+cold-prefill interval was 1.57 s versus 1.25 s. Cold first-token waits were
+308.57/440.89 s versus 310.62/441.31 s; complete batch time was 454.01 s
+versus 454.45 s. Generation was 2.35% slower and batch time differed by
+less than 0.1%, so this single comparison establishes no meaningful
+overall improvement. All four complete response token hashes matched
+the 4096-round reference, and both cold replies matched cached replays.
+The requested 1024-round setting was retained after that trial. Native binaries, kernels,
+model profile, 256K limit, four-request capacity and DSpark block five
+remain unchanged. Evidence: `.state/mixed-2p2d-r1024-20261028T044459Z/`.
+
+A matched control then tested the selected deployment unchanged:
+`TF_FILL_CHUNKS=1`, `TF_FILL_ROUNDS=4096`, and `TF_FILL_MANY` unset. All four
+request bodies were identical to the MANY-enabled 4096-round test. The two
+8,192-token decoders generated at 48.58/49.25 tokens/s, finishing in
+169.36/170.07 s. The cold first-token waits were 308.67/442.06 s, compared
+with 310.62/441.31 s with MANY enabled. Complete batch time was 455.40 s
+versus 454.45 s, a 0.21% difference; decoder mean rate differed by less
+than 0.02%. This single matched comparison shows no meaningful speed
+difference for these equal-length cold prompts. The visible scheduling
+change was three admitted streams plus one waiting, rather than all four
+admitted. All response token hashes matched the MANY-enabled reference,
+and both cold replies matched their cached replays. No runtime or deployment
+parameters changed during this test. Evidence:
+`.state/mixed-2p2d-r4096-many-off-20261028T051032Z/`.
+
+An exploratory deployment-only trial then used `TF_FILL_CHUNKS=2` and
+`TF_FILL_MANY=1`, retaining 4096 rounds and the exact same two-prefill/two-decoder
+requests. Mean decoder generation was 48.68 tokens/s versus 48.92 with the
+selected one-chunk/MANY-off deployment. The longest decoder content gap during
+cold prefill increased from 1.24 to 2.30 s. Cold first-token waits, sorted from
+shortest to longest, fell from 308.67/442.06 to 298.79/431.15 s; main-batch time fell from
+455.40 to 443.99 s (2.51%), excluding preparatory decoder preloads. This single
+comparison shows a small latency benefit with longer generation pauses;
+admitting both prefills still did not produce equal alternation. All four
+complete response token hashes matched the selected baseline, and both cold
+replies matched cached replays. Neither rank restarted or ran out of memory
+during the trial. Afterwards, both ranks were restored to the selected
+`TF_FILL_CHUNKS=1`, `TF_FILL_ROUNDS=4096`, MANY-unset deployment. Original runtime,
+launcher, profile and base Compose hashes matched on both nodes, and four
+concurrent reference replies passed after restoration. Evidence:
+`.state/mixed-2p2d-chunks2-many1-20261028T055359Z/`.
+
+The subsequent requested repeat retained one chunk, enabled MANY and set
+1024 rounds, with every request body identical to the earlier mixed tests.
+The two 8,192-token decoders generated at 47.27/47.57 tokens/s, finishing
+in 174.76/175.22 s. Compared with the earlier one-chunk/MANY-on 4096-round
+run, mean generation decreased 3.08% and the longest content gap increased
+from 1.25 to 1.58 s. Cold first-token waits were 311.00/442.71 s versus
+310.62/441.31 s. Main-batch time was 455.83 s versus 454.45 s (0.30% longer),
+excluding preparatory decoder preloads. This repeat shows no speed-up for
+the requested 1024-round configuration. All four full response token hashes
+matched the earlier references, both cold replies matched cached replays,
+and four concurrent reference replies passed. Neither rank restarted or ran
+out of memory. The requested `TF_FILL_CHUNKS=1`, `TF_FILL_ROUNDS=1024`,
+`TF_FILL_MANY=1` configuration was retained immediately after testing, with original
+runtime, launcher and profile hashes verified and both base Compose files
+matching the running containers. Evidence:
+`.state/mixed-2p2d-ch1-r1024-many1-repeat-20261028T061345Z/`.
+
+The user subsequently selected one chunk, 4096 rounds and MANY disabled again.
+Both base Compose files and running ranks now use that configuration; 256K,
+four-request capacity and DSpark block five are unchanged. Only the deployment
+parameters changed. Both nodes passed original runtime, launcher and profile
+hash checks, and four simultaneous reference replies passed with identical
+token hashes. Restoration receipt:
+`.state/selected-4096-many-off-restored-20261028T063011Z/`.
 
 ```bash
 ./dgx-model use tensorfold deepseek-v41-flash-1017-blackfold-exl3-native-tp2
